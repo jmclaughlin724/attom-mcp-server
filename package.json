@@ -1,13 +1,16 @@
 {
-  "name": "attom-mcp-plugin",
+  "name": "attom-mcp-server",
   "version": "1.0.0",
-  "description": "A comprehensive TypeScript plugin for ATTOM with no placeholders or skipping.",
+  "description": "A comprehensive MCP server for ATTOM Data API with Docker support, caching, and fallback mechanisms.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "server": "ts-node src/server.ts",
+    "server": "node dist/server.js",
     "dev": "nodemon --exec ts-node src/server.ts",
+    "dev:server": "ts-node src/server.ts",
+    "docker:build": "docker build -t attom-mcp-server -f attom_mcp.dockerfile .",
+    "docker:run": "./run_container.sh",
     "gen:openapi": "zod-openapi generate ./src/openapiRegistry.ts --output ./openapi/attom-api-schema.yaml",
     "test": "vitest"
   },
