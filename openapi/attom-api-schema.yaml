@@ -1,0 +1,4307 @@
+openapi: 3.1.0
+
+info:
+  title: "ATTOM Data API"
+  description: "API for accessing ATTOM real estate data services including property details, sales history, assessments, and geographic data."
+  version: "1.0.0"
+  contact:
+    name: "ATTOM API Support"
+    url: "https://api.gateway.attomdata.com/support"
+    email: "apisupport@attomdata.com"
+  license:
+    name: "Proprietary"
+    url: "https://api.gateway.attomdata.com/terms"
+  termsOfService: "https://api.gateway.attomdata.com/terms-of-service"
+
+# MCP server configuration for ATTOM Data API
+x-mcp-info:
+  name: "ATTOM Data API"
+  description: "MCP server for ATTOM real estate data services"
+  version: "1.0.0"
+  address-handling:
+    description: "This MCP server handles address-to-ID conversion automatically"
+    fallback-mechanism: "Uses x-mcp-fallback extension to define the conversion workflow"
+    address-parsing:
+      - "Single address strings are parsed into address1 (street) and address2 (city, state, zip)"
+      - "Address components are normalized and formatted for API compatibility"
+    error-handling:
+      - "If a required geoIdV4 tag is missing, appropriate error messages are returned"
+      - "If multiple potential matches exist, the most relevant match is selected"
+
+# Caching strategy to absorb 80-90% of traffic
+x-mcp-caching:
+  enabled: true
+  default-ttl: 3600  # 1 hour in seconds
+  strategies:
+    - type: "memory"
+      max-size: "1GB"
+    - type: "redis"
+      connection: "redis://localhost:6379"
+  endpoints:
+    # Property endpoints - moderate caching (properties change less frequently)
+    "/propertyapi/v1.0.0/property/detail": 
+      ttl: 86400  # 24 hours
+    "/propertyapi/v1.0.0/property/basicprofile": 
+      ttl: 86400  # 24 hours
+    "/propertyapi/v1.0.0/property/expandedprofile": 
+      ttl: 86400  # 24 hours
+    # Sales comparables endpoints
+    "/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}":
+      ttl: 86400  # 24 hours
+    "/property/v2/salescomparables/propid/{propId}":
+      ttl: 86400  # 24 hours
+    # Assessment data - longer caching (updates quarterly/annually)
+    "/propertyapi/v1.0.0/assessment/detail": 
+      ttl: 604800  # 1 week
+    # AVM data - shorter caching (more frequent updates)
+    "/propertyapi/v1.0.0/avm/detail": 
+      ttl: 43200  # 12 hours
+    "/propertyapi/v1.0.0/avm/snapshot": 
+      ttl: 43200  # 12 hours
+    "/propertyapi/v1.0.0/attomavm/detail": 
+      ttl: 43200  # 12 hours
+    "/propertyapi/v1.0.0/property/detailmortgage": 
+      ttl: 86400  # 24 hours
+    "/propertyapi/v1.0.0/property/detailmortgageowner": 
+      ttl: 86400  # 24 hours
+    "/propertyapi/v1.0.0/valuation/homeequity": 
+      ttl: 43200  # 12 hours
+    "/propertyapi/v1.0.0/valuation/rentalavm": 
+      ttl: 43200  # 12 hours
+    # Community data - longer caching (changes infrequently)
+    "/v4/neighborhood/community": 
+      ttl: 604800  # 1 week
+    # School data - moderate caching
+    "/v4/school/profile": 
+      ttl: 259200  # 3 days
+    "/v4/school/district": 
+      ttl: 604800  # 1 week
+    # POI data - moderate caching
+    "/v4/neighborhood/poi": 
+      ttl: 259200  # 3 days
+    # Transportation data - longer caching (changes infrequently)
+    "/transportationnoise": 
+      ttl: 604800  # 1 week
+
+# Cache key configuration for each endpoint
+x-mcp-cache-keys:
+  # Property endpoints
+  "/propertyapi/v1.0.0/property/detail": ["attomid"]
+  "/propertyapi/v1.0.0/property/basicprofile": ["address1", "address2"]
+  "/propertyapi/v1.0.0/property/expandedprofile": ["address1", "address2"]
+  "/propertyapi/v1.0.0/property/detailowner": ["attomid"]
+  "/propertyapi/v1.0.0/property/detailmortgage": ["attomid"]
+  "/propertyapi/v1.0.0/property/detailmortgageowner": ["attomid"]
+  
+  # Assessment endpoints
+  "/propertyapi/v1.0.0/assessment/detail": ["address1", "address2"]
+  "/propertyapi/v1.0.0/assessmenthistory/detail": ["attomid"]
+  
+  # AVM endpoints
+  "/propertyapi/v1.0.0/attomavm/detail": ["address1", "address2"]
+  "/propertyapi/v1.0.0/avmhistory/detail": ["address1", "address2"]
+  "/propertyapi/v1.0.0/avm/snapshot": ["attomid"]
+  "/propertyapi/v1.0.0/valuation/homeequity": ["attomid"]
+  "/propertyapi/v1.0.0/valuation/rentalavm": ["attomid"]
+  
+  # Sales endpoints
+  "/propertyapi/v1.0.0/sale/detail": ["address1", "address2"]
+  "/propertyapi/v1.0.0/sale/snapshot": ["geoIdV4", "startsalesearchdate", "endsalesearchdate"]
+  "/propertyapi/v1.0.0/saleshistory/detail": ["address1", "address2"]
+  "/propertyapi/v1.0.0/saleshistory/basichistory": ["address1", "address2"]
+  "/propertyapi/v1.0.0/saleshistory/expandedhistory": ["address1", "address2"]
+  "/propertyapi/v1.0.0/saleshistory/snapshot": ["attomid"]
+  
+  # All events endpoints
+  "/propertyapi/v1.0.0/allevents/detail": ["id"]
+  "/propertyapi/v1.0.0/allevents/snapshot": ["id"]
+  
+  # Sales comparables endpoints
+  "/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}": ["street", "city", "county", "state", "zip", "searchType", "minComps", "maxComps", "miles"]
+  "/property/v2/salescomparables/propid/{propId}": ["propId", "searchType", "minComps", "maxComps", "miles"]
+  
+  # Community and area endpoints
+  "/v4/neighborhood/community": ["geoIdV4"]
+  "/v4/transaction/salestrend": ["geoIdV4", "interval", "startyear", "endyear", "propertytype"]
+  
+  # School endpoints
+  "/v4/school/profile": ["geoIdV4"]
+  "/v4/school/district": ["geoIdV4"]
+  "/v4/school/search": ["geoIdV4", "radius", "page", "pageSize"]
+  "/propertyapi/v4/property/detailwithschools": ["attomid"]
+  
+  # POI and transportation endpoints
+  "/v4/neighborhood/poi": ["address", "radius", "categoryName", "recordLimit"]
+  "/transportationnoise": ["address"]
+  
+
+# Rate limits information for API endpoints
+x-mcp-rate-limits:
+  default:
+    requests-per-minute: 60
+    requests-per-day: 10000
+  endpoints:
+    # Property API rate limits
+    "/propertyapi/v1.0.0/property/detail":
+      requests-per-minute: 60
+      requests-per-day: 10000
+    # Sales Comparables API rate limits
+    "/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}":
+      requests-per-minute: 30
+      requests-per-day: 5000
+    "/property/v2/salescomparables/propid/{propId}":
+      requests-per-minute: 30
+      requests-per-day: 5000
+    # POI API rate limits
+    "/v4/neighborhood/poi":
+      requests-per-minute: 40
+      requests-per-day: 8000
+      max-record-limit: 50
+      default-record-limit: 20
+    # Area API rate limits
+    "/areaapi/v2.0.0/boundary/detail":
+      requests-per-minute: 30
+      requests-per-day: 5000
+      max-geoids-per-request: 3
+
+# API Documentation
+x-documentation:
+  description: |
+    API for accessing property, sales, community, school, and transportation data with fallback mechanisms for address-based queries.
+    
+    ## Security
+    All requests to all endpoints require you to specify your unique API key. The API Key is assigned to you by Attom and is used to identify and authorize each request. Your API key should be kept private, and should never be displayed publicly.
+    
+    ## Response Codes
+    All successful responses are returned in JSON or XML, depending on the response format you request. Only queries that respond with a 200 response code (successfully completed), are counted towards monthly allowances and overages. Beyond standard HTTP codes you will find custom status codes in the "Status" element of the response body.
+    
+    ### Status Code > Description
+    - 200 OK > Standard HTTP successful response
+    - 400 Bad Request > Standard HTTP invalid request response
+    - 401 Unauthorized > Standard HTTP unauthorized access response
+    - 500 Internal Server Error > There was an unexpected error on our server
+    
+    ## Default Behavior
+    - Maximum number of records in a single response: 100
+    - Default radius if not supplied: 5 miles
+    - Maximum radius allowed: 20 miles
+    - Maximum sort values: 1
+    - Maximum number of GeoIDs in a single request: 3
+    - Default sort, radius search: Distance Asc
+    - Default sort, non-radius searches: CalendarDate Desc
+
+tags:
+  - name: "Property"
+    description: "Endpoints for accessing property details, building permits, assessments, and valuations"
+  - name: "Sale"
+    description: "Endpoints for accessing property sales data and history"
+  - name: "Assessment"
+    description: "Endpoints for accessing property assessment and tax information"
+  - name: "AVM"
+    description: "Endpoints for accessing Automated Valuation Model data"
+  - name: "SalesHistory"
+    description: "Endpoints for accessing property sales history"
+  - name: "AllEvents"
+    description: "Endpoints for accessing all events related to a property"
+  - name: "Transaction"
+    description: "Endpoints for accessing transaction data and trends"
+  - name: "Area"
+    description: "Endpoints for accessing geographic area information"
+  - name: "Community"
+    description: "Endpoints for accessing community and neighborhood data"
+  - name: "School"
+    description: "Endpoints for accessing school information and districts"
+  - name: "Transportation"
+    description: "Endpoints for accessing transportation and noise data"
+  - name: "POI"
+    description: "Endpoints for accessing points of interest"
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  ##############################
+  # PROPERTY API ENDPOINTS
+  ##############################
+  
+  # Basic property profile endpoint - entry point for property data
+  /propertyapi/v1.0.0/property/basicprofile:
+    get:
+      operationId: getPropertyBasicProfile
+      summary: "Get basic property profile"
+      description: |
+        Retrieves basic property details using attomid or address fallback.
+        
+        Fallback: If only address is supplied, use address1 & address2 parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example: 
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/basicprofile?address1=6405%20Jamaica%20Ct&address2=Tallahassee%2C%20FL%2032309'
+        ```
+      tags: ["Property"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicProfileResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Building permits endpoint - critical for address-to-ID conversion
+  /propertyapi/v1.0.0/property/buildingpermits:
+    get:
+      operationId: getPropertyBuildingPermits
+      summary: "Get building permits"
+      description: |
+        Returns property info and building permits using attomid or address fallback.
+        If address1 and address2 are provided, this endpoint can be used to obtain the attomId.
+        
+        Fallback: If only address is supplied, use address1 & address2 parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        `https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/buildingpermits?address1=3120%20Brandywine%20Dr&address2=Tallahassee,%20FL%2032308`
+      tags: ["Property"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildingPermitsResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Property detail endpoint - requires attomId
+  /propertyapi/v1.0.0/property/detail:
+    get:
+      operationId: getPropertyDetail
+      summary: "Get detailed property information"
+      description: |
+        Returns detailed property information using attomid parameter.
+        
+        **Fallback Logic:** If attomid is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail?attomid=5047525'
+        ```
+      tags: ["Property"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+          
+  # Property mortgage detail endpoint
+  /propertyapi/v1.0.0/property/detailmortgage:
+    get:
+      operationId: getPropertyDetailMortgage
+      summary: "Get detailed property information with mortgage data"
+      description: |
+        Returns detailed property information including mortgage data using attomid parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detailmortgage?attomid=5047525'
+        ```
+      tags: ["Property"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyDetailMortgageResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+          
+  # Property mortgage + owner detail endpoint
+  /propertyapi/v1.0.0/property/detailmortgageowner:
+    get:
+      operationId: getPropertyDetailMortgageOwner
+      summary: "Get detailed property information with mortgage and owner data"
+      description: |
+        Returns detailed property information including both mortgage and owner data using attomid parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detailmortgageowner?attomid=5047525'
+        ```
+      tags: ["Property"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailMortgageOwnerResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  # Property owner detail endpoint - requires attomId
+  /propertyapi/v1.0.0/property/detailowner:
+    get:
+      operationId: getPropertyDetailOwner
+      summary: "Get detailed property information with owner data"
+      description: |
+        Returns detailed property information including owner data using attomid parameter.
+        
+        **Fallback Logic:** If attomid is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detailowner?attomid=5047525'
+        ```
+      tags: ["Property"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailOwnerResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Expanded property profile endpoint
+  /propertyapi/v1.0.0/property/expandedprofile:
+    get:
+      operationId: getPropertyExpandedProfile
+      summary: "Get expanded property profile"
+      description: |
+        Returns expanded property information using attomid or address parameters.
+        
+        **Fallback Logic:** If only address is supplied, use address1 & address2 parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/expandedprofile?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["Property"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpandedProfileResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  ##############################
+  # ASSESSMENT API ENDPOINTS
+  ##############################
+  
+  # Assessment detail endpoint - uses address parameters
+  /propertyapi/v1.0.0/assessment/detail:
+    get:
+      operationId: getAssessmentDetail
+      summary: "Get detailed assessment information for a property"
+      description: |
+        Returns detailed assessment information for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/assessment/detail?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["Assessment"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Assessment history detail endpoint - requires attomId
+  /propertyapi/v1.0.0/assessmenthistory/detail:
+    get:
+      operationId: getAssessmentHistoryDetail
+      summary: "Get assessment history for a property"
+      description: |
+        Returns assessment history for a property using attomid parameter.
+        
+        **Fallback Logic:** If attomid is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/assessmenthistory/detail?attomid=324388503'
+        ```
+      tags: ["Assessment"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentHistoryDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  ##############################
+  # TRANSACTION API ENDPOINTS
+  ##############################
+  
+  # Sales trend endpoint - requires N2 geoIdV4 tag
+  /v4/transaction/salestrend:
+    get:
+      operationId: getTransactionSalesTrend
+      summary: "Get sales trends for a neighborhood"
+      description: |
+        Retrieves sales trend data for a neighborhood based on geoIdV4, interval, and year range.
+        
+        **Fallback Logic:** If geoIdV4 is not available, first call the /propertyapi/v1.0.0/property/buildingpermits endpoint with address parameters to extract the "N2" geoIdV4 tag from the response.
+        
+        **Parameter Defaults:**
+        - interval: "yearly"
+        - startyear: 5 years before the current year
+        - endyear: current year
+        - propertytype: "ALL"
+        - transfertype: default
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/v4/transaction/salestrend?geoIdV4=6c61abacba0419a7cf2b492fd0c1f80c&interval=yearly&startyear=2020&endyear=2025&propertytype=ALL'
+        ```
+      tags: ["Sale"]
+      parameters:
+        - name: geoIdV4
+          in: query
+          description: "Neighborhood (N2) geographic ID"
+          required: true
+          schema:
+            type: string
+            example: "6c61abacba0419a7cf2b492fd0c1f80c"
+        - name: interval
+          in: query
+          description: "Time interval for sales trends (yearly, quarterly, monthly)"
+          required: false
+          schema:
+            type: string
+            default: "yearly"
+            enum: ["yearly", "quarterly", "monthly"]
+        - name: startyear
+          in: query
+          description: "Start year for sales trends (defaults to 5 years before current year)"
+          required: false
+          schema:
+            type: string
+            example: "2020"
+        - name: endyear
+          in: query
+          description: "End year for sales trends (defaults to current year)"
+          required: false
+          schema:
+            type: string
+            example: "2025"
+        - name: propertytype
+          in: query
+          description: "Property type filter"
+          required: false
+          schema:
+            type: string
+            default: "ALL"
+            enum: ["ALL", "SFR", "CONDO", "MULTI", "LAND", "FARM", "MOBILE", "COM"]
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesTrendResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:geoIdV4"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.location.geoIdV4.N2"
+          target-parameter: "geoIdV4"
+
+  ##############################
+  # ALL EVENTS API ENDPOINTS
+  ##############################
+  
+  # All events detail endpoint - requires attomId as "id"
+  /propertyapi/v1.0.0/allevents/detail:
+    get:
+      operationId: getAllEventsDetail
+      summary: "Get all property events detail"
+      description: |
+        Returns comprehensive property information including assessment, AVM, and sales data using the id parameter.
+        
+        **Fallback Logic:** If id is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response and use it as the id parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/allevents/detail?id=324388503'
+        ```
+      tags: ["AllEvents"]
+      parameters:
+        - name: id
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllEventsDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:id"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "id"
+
+  # All events snapshot endpoint - requires attomId as "id"
+  /propertyapi/v1.0.0/allevents/snapshot:
+    get:
+      operationId: getAllEventsSnapshot
+      summary: "Get all property events snapshot"
+      description: |
+        Returns a snapshot of property information including assessment, AVM, and sales data using the id parameter.
+        
+        **Fallback Logic:** If id is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response and use it as the id parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/allevents/snapshot?id=324388503'
+        ```
+      tags: ["AllEvents"]
+      parameters:
+        - name: id
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllEventsSnapshotResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:id"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "id"
+
+  ##############################
+  # COMMUNITY API ENDPOINTS
+  ##############################
+  
+  # Community profile endpoint - requires N2 geoIdV4 tag
+  /v4/neighborhood/community:
+    get:
+      operationId: getCommunityProfile
+      summary: "Get community profile"
+      description: |
+        Retrieves community profile information for a neighborhood based on geoIdV4.
+        Provides extensive demographic, crime, natural disaster, air quality, and weather information.
+        
+        The API provides access to over 600 different attributes aggregated to the State, County, Census Place, County Subdivision, Zip Code or Neighborhood level.
+        
+        **Important:** This endpoint requires the N2 geoIdV4 tag which can be obtained from the /propertyapi/v1.0.0/property/buildingpermits endpoint.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        `https://api.gateway.attomdata.com/v4/neighborhood/community?geoIdV4=6c61abacba0419a7cf2b492fd0c1f80c`
+      tags: ["Community"]
+      x-mcp-fallback:
+        description: "Automated fallback process for address-only queries"
+        source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+        source-parameters: ["address1", "address2"]
+        extract-field: "property.geolocation.geoidV4.N2"
+        target-parameter: "geoIdV4"
+      parameters:
+        - name: geoIdV4
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Geographic ID (v4) for the area (must be N2 tag). Can be obtained from the /propertyapi/v1.0.0/property/buildingpermits endpoint."
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunityProfileResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  ##############################
+  # TRANSPORTATION API ENDPOINTS
+  ##############################
+  
+  # Transportation noise endpoint - provides noise environment data
+  /transportationnoise:
+    get:
+      operationId: getTransportationNoise
+      summary: "Get transportation noise data"
+      description: |
+        Get a location's noise environment. Includes noise ratings for roads and highways, airports, railroads, 
+        railroad crossings and hospital/fire vehicle stations.
+        
+        The API returns detailed noise information including:
+        - Road noise (level and sources)
+        - Aviation noise (level and sources)
+        - Emergency vehicle noise (level and sources)
+        - Rail whistle noise (level and sources)
+        - Rail noise (level and sources)
+        - Overall noise summary
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        `https://api.gateway.attomdata.com/transportationnoise?address=3120%20Brandywine%20Dr%2C%20Tallahassee%2C%20FL%2032308`
+      tags: ["Transportation"]
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Full address (street, city, state, ZIP)"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransportationNoiseResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+        '406':
+          description: "Not Acceptable - Header not acceptable"
+        '500':
+          description: "Internal Server Error - There was an unexpected error on the server"
+
+  ##############################
+  # SALES API ENDPOINTS
+  ##############################
+  
+  # Sale snapshot endpoint - requires geoIdV4
+  /propertyapi/v1.0.0/sale/snapshot:
+    get:
+      operationId: getSaleSnapshot
+      summary: "Get sales snapshot for a neighborhood"
+      description: |
+        Returns a snapshot of recent sales in a neighborhood based on geoIdV4 and date range.
+        
+        **Fallback Logic:** If geoIdV4 is not available, first call the /propertyapi/v1.0.0/property/buildingpermits endpoint with address parameters to extract the "N2" geoIdV4 tag from the response.
+        
+        **Parameter Defaults:**
+        - startsalesearchdate: 12 months prior to the current date (format: YYYY-MM-DD)
+        - endsalesearchdate: current date (format: YYYY-MM-DD)
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/sale/snapshot?geoIdV4=6c61abacba0419a7cf2b492fd0c1f80c&startsalesearchdate=2024-04-15&endsalesearchdate=2025-04-14'
+        ```
+      tags: ["Sale"]
+      parameters:
+        - name: geoIdV4
+          in: query
+          description: "Neighborhood (N2) geographic ID"
+          required: true
+          schema:
+            type: string
+            example: "6c61abacba0419a7cf2b492fd0c1f80c"
+        - name: startsalesearchdate
+          in: query
+          description: "Start date for sales search (format: YYYY-MM-DD, defaults to 12 months prior to current date)"
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-04-15"
+        - name: endsalesearchdate
+          in: query
+          description: "End date for sales search (format: YYYY-MM-DD, defaults to current date)"
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2025-04-14"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleSnapshotResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:geoIdV4"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.location.geoIdV4.N2"
+          target-parameter: "geoIdV4"
+
+  # Sale detail endpoint - uses address parameters
+  /propertyapi/v1.0.0/sale/detail:
+    get:
+      operationId: getSaleDetail
+      summary: "Get detailed sale information for a property"
+      description: |
+        Returns detailed sale information for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/sale/detail?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["Sale"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  ##############################
+  # SALES HISTORY API ENDPOINTS
+  ##############################
+  
+  # Sales history snapshot endpoint - requires attomId
+  /propertyapi/v1.0.0/saleshistory/snapshot:
+    get:
+      operationId: getSalesHistorySnapshot
+      summary: "Get sales history snapshot for a property"
+      description: |
+        Returns a snapshot of sales history for a property using attomid parameter.
+        
+        **Fallback Logic:** If attomid is not available, first call the /propertyapi/v1.0.0/property/buildingpermits endpoint with address parameters to extract the attomId from the response.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/saleshistory/snapshot?attomid=324388503'
+        ```
+      tags: ["SalesHistory"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesHistorySnapshotResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  # Sales history basic history endpoint - uses address parameters
+  /propertyapi/v1.0.0/saleshistory/basichistory:
+    get:
+      operationId: getSalesHistoryBasic
+      summary: "Get basic sales history for a property"
+      description: |
+        Returns basic sales history for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/saleshistory/basichistory?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["SalesHistory"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesHistoryBasicResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Sales history expanded history endpoint - uses address parameters
+  /propertyapi/v1.0.0/saleshistory/expandedhistory:
+    get:
+      operationId: getSalesHistoryExpanded
+      summary: "Get expanded sales history for a property"
+      description: |
+        Returns expanded sales history for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/saleshistory/expandedhistory?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["SalesHistory"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesHistoryExpandedResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # Sales history detail endpoint - uses address parameters
+  /propertyapi/v1.0.0/saleshistory/detail:
+    get:
+      operationId: getSalesHistoryDetail
+      summary: "Get detailed sales history for a property"
+      description: |
+        Returns detailed sales history for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/saleshistory/detail?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["SalesHistory"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesHistoryDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  ##############################
+  # AVM API ENDPOINTS
+  ##############################
+  
+  # AVM detail endpoint - uses address parameters
+  /propertyapi/v1.0.0/attomavm/detail:
+    get:
+      operationId: getAvmDetail
+      summary: "Get detailed AVM information for a property"
+      description: |
+        Returns detailed Automated Valuation Model (AVM) information for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/attomavm/detail?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["AVM"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvmDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # AVM history detail endpoint - uses address parameters
+  /propertyapi/v1.0.0/avmhistory/detail:
+    get:
+      operationId: getAvmHistoryDetail
+      summary: "Get AVM history for a property"
+      description: |
+        Returns Automated Valuation Model (AVM) history for a property using address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/avmhistory/detail?address1=3120%20Brandywine%20Dr&address2=Tallahassee%2C%20FL%2032308'
+        ```
+      tags: ["AVM"]
+      parameters:
+        - $ref: "#/components/parameters/address1"
+        - $ref: "#/components/parameters/address2"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvmHistoryDetailResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+
+  # AVM snapshot endpoint
+  /propertyapi/v1.0.0/avm/snapshot:
+    get:
+      operationId: getAvmSnapshot
+      summary: "Get AVM snapshot for a property"
+      description: |
+        Returns a snapshot of Automated Valuation Model (AVM) information for a property using attomid parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/avm/snapshot?attomid=5047525'
+        ```
+      tags: ["AVM"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvmSnapshotResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  # Home equity valuation endpoint
+  /propertyapi/v1.0.0/valuation/homeequity:
+    get:
+      operationId: getHomeEquityValuation
+      summary: "Get home equity valuation for a property"
+      description: |
+        Returns home equity valuation information for a property using attomid parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/valuation/homeequity?attomid=5047525'
+        ```
+      tags: ["AVM"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeEquityResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  # Rental AVM endpoint
+  /propertyapi/v1.0.0/valuation/rentalavm:
+    get:
+      operationId: getRentalAvm
+      summary: "Get rental AVM for a property"
+      description: |
+        Returns rental Automated Valuation Model (AVM) information for a property using attomid parameter.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/valuation/rentalavm?attomid=5047525'
+        ```
+      tags: ["AVM"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "5047525"
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalAvmResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+
+  ##############################
+  # SCHOOL API ENDPOINTS
+  ##############################
+  
+  # Property with schools endpoint - requires attomId
+  /propertyapi/v4/property/detailwithschools:
+    get:
+      operationId: getPropertyDetailWithSchools
+      summary: "Get property details with assigned schools"
+      description: |
+        Returns detailed property information including assigned schools using attomid parameter.
+        
+        **Fallback Logic:** If attomid is not available, first call the /property/buildingpermits endpoint with address parameters to extract the attomId from the response.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/propertyapi/v4/property/detailwithschools?attomid=324388503'
+        ```
+      tags: ["Property", "School"]
+      parameters:
+        - name: attomid
+          in: query
+          description: "ATTOM property ID (case sensitive, must be lowercase)"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+      responses:
+        '200':
+          description: "Success - list of schools"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyDetailWithSchoolsResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+        '403':
+          description: "Forbidden - API key invalid/missing"
+        'default':
+          description: "Unexpected error"
+      x-mcp-fallback:
+        - condition: "missing-parameter:attomid"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "attomid"
+          
+  # School profile endpoint - requires geoIdV4
+  /v4/school/profile:
+    get:
+      operationId: getSchoolProfile
+      summary: "Get detailed information about a school"
+      description: |
+        Returns detailed information about a specific school using its geoIdV4 identifier.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/v4/school/profile?geoIdV4=3defed8585aee270f6b736cb813df875'
+        ```
+      tags: ["School"]
+      parameters:
+        - name: geoIdV4
+          in: query
+          description: "Geographic ID v4 for the school (SB tag)"
+          required: true
+          schema:
+            type: string
+            example: "3defed8585aee270f6b736cb813df875"
+      responses:
+        '200':
+          description: "Success - list of schools"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolProfileResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+        '403':
+          description: "Forbidden - API key invalid/missing"
+        'default':
+          description: "Unexpected error"
+          
+  # School district endpoint - requires geoIdV4
+  /v4/school/district:
+    get:
+      operationId: getSchoolDistrict
+      summary: "Get detailed information about a school district"
+      description: |
+        Returns detailed information about a specific school district using its geoIdV4 identifier.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/v4/school/district?geoIdV4=9a2f4e6afaf8f596fc84f75261649308'
+        ```
+      tags: ["School"]
+      parameters:
+        - name: geoIdV4
+          in: query
+          description: "Geographic ID v4 for the school district (DB tag)"
+          required: true
+          schema:
+            type: string
+            example: "9a2f4e6afaf8f596fc84f75261649308"
+      responses:
+        '200':
+          description: "Success - list of school districts"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolDistrictResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+        '403':
+          description: "Forbidden - API key invalid/missing"
+        'default':
+          description: "Unexpected error"
+          
+  # School search endpoint - requires geoIdV4 or address
+  /v4/school/search:
+    get:
+      operationId: searchSchools
+      summary: "Search for schools near a location"
+      description: |
+        Returns a list of schools near a specified location using either geoIdV4, address, or latitude/longitude coordinates.
+        
+        **Required Headers:**
+        - Accept: application/json or application/xml
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' --header 'accept: application/json' 'https://api.gateway.attomdata.com/v4/school/search?geoIdV4=6c61abacba0419a7cf2b492fd0c1f80c&radius=5&page=1&pageSize=200'
+        ```
+      tags: ["School"]
+      parameters:
+        - name: geoIdV4
+          in: query
+          description: "Geographic ID v4 for the location (N2 tag preferred)"
+          required: false
+          schema:
+            type: string
+            example: "6c61abacba0419a7cf2b492fd0c1f80c"
+        - name: latitude
+          in: query
+          description: "Latitude coordinate"
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: longitude
+          in: query
+          description: "Longitude coordinate"
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: radius
+          in: query
+          description: "Search radius in miles (default: 5)"
+          required: false
+          schema:
+            type: number
+            default: 5
+        - name: page
+          in: query
+          description: "Page number for pagination"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          description: "Number of results per page"
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: "Success - list of schools"
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "Caching directives"
+            ETag:
+              schema:
+                type: string
+              description: "Entity tag for cache validation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolSearchResponse"
+        '400':
+          description: "Bad Request - See status codes in response body for details"
+        '401':
+          description: "Unauthorized - Invalid or missing API key"
+        '403':
+          description: "Forbidden - API key invalid/missing"
+        'default':
+          description: "Unexpected error"
+
+  ##############################
+  # SALES COMPARABLES ENDPOINTS
+  ##############################
+
+  # Sales comparables by address endpoint
+  /property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}:
+    get:
+      operationId: getSalesComparablesByAddress
+      summary: "Get sales comparables by address"
+      description: |
+        Returns sales comparables for a property based on address parameters.
+        
+        **Required Headers:**
+        - Accept: application/json
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' 'https://api.gateway.attomdata.com/property/v2/salescomparables/address/3120%20Brandywine%20Dr/Tallahassee/-/FL/32308?searchType=Radius&minComps=1&maxComps=10&miles=5&sameCity=true&useSameTargetCode=true&bedroomsRange=1&bathroomRange=1&sqFeetRange=600&lotSizeRange=3000&saleDateRange=12&yearBuiltRange=20&ownerOccupied=Both&distressed=IncludeDistressed'
+        ```
+      tags: ["Sale"]
+      parameters:
+        - name: street
+          in: path
+          description: "Street address"
+          required: true
+          schema:
+            type: string
+            example: "3120 Brandywine Dr"
+        - name: city
+          in: path
+          description: "City name"
+          required: true
+          schema:
+            type: string
+            example: "Tallahassee"
+        - name: county
+          in: path
+          description: "County name (use '-' if unknown)"
+          required: true
+          schema:
+            type: string
+            example: "-"
+        - name: state
+          in: path
+          description: "State code"
+          required: true
+          schema:
+            type: string
+            example: "FL"
+        - name: zip
+          in: path
+          description: "ZIP code"
+          required: true
+          schema:
+            type: string
+            example: "32308"
+        - name: searchType
+          in: query
+          description: "Type of search (Radius or TargetCode)"
+          required: false
+          schema:
+            type: string
+            enum: ["Radius", "TargetCode"]
+            default: "Radius"
+        - name: minComps
+          in: query
+          description: "Minimum number of comparables"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: maxComps
+          in: query
+          description: "Maximum number of comparables"
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: miles
+          in: query
+          description: "Search radius in miles"
+          required: false
+          schema:
+            type: number
+            default: 5
+        - name: sameCity
+          in: query
+          description: "Limit results to same city"
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: useSameTargetCode
+          in: query
+          description: "Use same target code"
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: bedroomsRange
+          in: query
+          description: "Bedrooms range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: bathroomRange
+          in: query
+          description: "Bathrooms range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: sqFeetRange
+          in: query
+          description: "Square feet range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 600
+        - name: lotSizeRange
+          in: query
+          description: "Lot size range in square feet (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 3000
+        - name: saleDateRange
+          in: query
+          description: "Sale date range in months"
+          required: false
+          schema:
+            type: integer
+            default: 12
+        - name: yearBuiltRange
+          in: query
+          description: "Year built range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: ownerOccupied
+          in: query
+          description: "Owner occupancy filter"
+          required: false
+          schema:
+            type: string
+            enum: ["OwnerOccupied", "NonOwnerOccupied", "Both"]
+            default: "Both"
+        - name: distressed
+          in: query
+          description: "Include distressed properties"
+          required: false
+          schema:
+            type: string
+            enum: ["IncludeDistressed", "ExcludeDistressed", "OnlyDistressed"]
+            default: "IncludeDistressed"
+      responses:
+        '200':
+          <<: *success_response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesComparablesResponse"
+        '400': *bad_request_response
+        '401': *unauthorized_response
+
+  # Sales comparables by property ID endpoint
+  /property/v2/salescomparables/propid/{propId}:
+    get:
+      operationId: getSalesComparablesByPropId
+      summary: "Get sales comparables by property ID"
+      description: |
+        Returns sales comparables for a property based on its ATTOM property ID.
+        
+        **Required Headers:**
+        - Accept: application/json
+        - APIKey: Your assigned API key
+        
+        Example:
+        ```
+        curl -X GET --header 'Accept: application/json' --header 'apikey: YOUR_API_KEY' 'https://api.gateway.attomdata.com/property/v2/salescomparables/propid/324388503?searchType=Radius&minComps=1&maxComps=10&miles=5&sameCity=true&useSameTargetCode=true&bedroomsRange=1&bathroomRange=1&sqFeetRange=600&lotSizeRange=3000&saleDateRange=12&yearBuiltRange=20&ownerOccupied=Both&distressed=IncludeDistressed'
+        ```
+      tags: ["Sale"]
+      parameters:
+        - name: propId
+          in: path
+          description: "ATTOM property ID"
+          required: true
+          schema:
+            type: string
+            example: "324388503"
+        - name: searchType
+          in: query
+          description: "Type of search (Radius or TargetCode)"
+          required: false
+          schema:
+            type: string
+            enum: ["Radius", "TargetCode"]
+            default: "Radius"
+        - name: minComps
+          in: query
+          description: "Minimum number of comparables"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: maxComps
+          in: query
+          description: "Maximum number of comparables"
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: miles
+          in: query
+          description: "Search radius in miles"
+          required: false
+          schema:
+            type: number
+            default: 5
+        - name: sameCity
+          in: query
+          description: "Limit results to same city"
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: useSameTargetCode
+          in: query
+          description: "Use same target code"
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: bedroomsRange
+          in: query
+          description: "Bedrooms range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: bathroomRange
+          in: query
+          description: "Bathrooms range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: sqFeetRange
+          in: query
+          description: "Square feet range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 600
+        - name: lotSizeRange
+          in: query
+          description: "Lot size range in square feet (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 3000
+        - name: saleDateRange
+          in: query
+          description: "Sale date range in months"
+          required: false
+          schema:
+            type: integer
+            default: 12
+        - name: yearBuiltRange
+          in: query
+          description: "Year built range (+/-)"
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: ownerOccupied
+          in: query
+          description: "Owner occupancy filter"
+          required: false
+          schema:
+            type: string
+            enum: ["OwnerOccupied", "NonOwnerOccupied", "Both"]
+            default: "Both"
+        - name: distressed
+          in: query
+          description: "Include distressed properties"
+          required: false
+          schema:
+            type: string
+            enum: ["IncludeDistressed", "ExcludeDistressed", "OnlyDistressed"]
+            default: "IncludeDistressed"
+      responses:
+        '200':
+          <<: *success_response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesComparablesResponse"
+        '400': *bad_request_response
+        '401': *unauthorized_response
+      x-mcp-fallback:
+        - condition: "missing-parameter:propId"
+          source-endpoint: "/propertyapi/v1.0.0/property/buildingpermits"
+          source-parameters: ["address1", "address2"]
+          extract-field: "property.identifier.attomId"
+          target-parameter: "propId"
+
+  ##############################
+  # SECURITY DEFINITIONS
+  ##############################
+  
+components:
+  # Define common response headers as YAML anchors
+  x-response-headers:
+    standard: &standard_headers
+      Cache-Control:
+        schema:
+          type: string
+        description: "Caching directives"
+      ETag:
+        schema:
+          type: string
+        description: "Entity tag for cache validation"
+  
+  # Define common response status codes as YAML anchors
+  x-responses:
+    success: &success_response
+      description: "Success"
+      headers: *standard_headers
+    
+    bad_request: &bad_request_response
+      description: "Bad Request - See status codes in response body for details"
+    
+    unauthorized: &unauthorized_response
+      description: "Unauthorized - Invalid or missing API key"
+    
+    forbidden: &forbidden_response
+      description: "Forbidden - API key invalid/missing"
+    
+    not_found: &not_found_response
+      description: "Not Found - Resource not found"
+    
+    unexpected_error: &unexpected_error_response
+      description: "Unexpected error"
+  
+  securitySchemes:
+    # API Key authentication for all endpoints
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: APIKey
+      description: "API key authentication. Required for all API calls."
+  
+  parameters:
+    # Common reusable parameters
+    AttomId:
+      in: query
+      name: attomid
+      schema:
+        type: string
+      description: "ATTOM property ID"
+      
+    address1:
+      in: query
+      name: address1
+      schema:
+        type: string
+      description: "Street address (e.g., 123 Main St)"
+      
+    address2:
+      in: query
+      name: address2
+      schema:
+        type: string
+      description: "City, state, ZIP (e.g., Anytown, CA 12345)"
+      
+    Debug:
+      in: query
+      name: debug
+      schema:
+        type: boolean
+        default: false
+      description: "Enable debug mode to receive additional information in the response"
+
+  schemas:
+    # Response schemas organized by endpoint type
+    # Each schema should have a clear description and proper structure
+    
+    DetailMortgageOwnerResponse:
+      type: object
+      description: "Response for property detail with mortgage and owner information"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: object
+          description: "Property details with mortgage and owner information"
+    
+    AvmSnapshotResponse:
+      type: object
+      description: "Response for AVM snapshot"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        avm:
+          type: object
+          description: "AVM snapshot information"
+    
+    HomeEquityResponse:
+      type: object
+      description: "Response for home equity valuation"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        valuation:
+          type: object
+          description: "Home equity valuation information"
+    
+    RentalAvmResponse:
+      type: object
+      description: "Response for rental AVM"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        rental:
+          type: object
+          description: "Rental AVM information"
+    
+    # Common components
+    Status:
+      type: object
+      description: |
+        Standard status information returned in all API responses.
+        Status codes:
+          0: SuccessWithResult - Request successful with results
+          -4: Invalid Parameter Combination - Invalid combination of parameters
+          -5: Invalid Parameter in Request - Invalid search parameter
+          -6: Missing Parameter in Request - Location-based inputs missing or incomplete
+          -8: Either GeoID or GeoIDV4 Value Required - Pass either GeoIDV4 or GeoID, not both
+          37: Address1 and Address2 Value Required - Both address fields required
+          400: SuccessWithoutResult - Request successful but no results found
+          401: Unauthorized - Invalid or missing API key
+      properties:
+        version:
+          type: string
+          description: "API version"
+          example: "1.0.0"
+        code:
+          type: integer
+          description: "Response code (0 = success)"
+          example: 0
+        msg:
+          type: string
+          description: "Response message"
+          example: "SuccessWithResult"
+        total:
+          type: integer
+          description: "Total number of records available"
+          example: 1
+        page:
+          type: integer
+          description: "Current page number"
+          example: 1
+        pagesize:
+          type: integer
+          description: "Number of records per page"
+          example: 10
+        responseDateTime:
+          type: string
+          format: date-time
+          description: "Response timestamp"
+          example: "2025-04-16T22:00:29.555Z"
+        transactionID:
+          type: string
+          description: "Unique transaction identifier"
+          example: "278be451bb4daebe1168557649f4a6e2"
+        attomId:
+          type: integer
+          description: "ATTOM property identifier when applicable"
+          example: 324388503
+    
+    PropertyIdentifier:
+      type: object
+      description: "Property identification information"
+      properties:
+        Id:
+          type: integer
+          description: "Internal property ID"
+          example: 324388503
+        fips:
+          type: string
+          description: "FIPS code"
+          example: "12073"
+        apn:
+          type: string
+          description: "Assessor's Parcel Number"
+          example: "11-17-90-  M-003-0"
+        attomId:
+          type: integer
+          description: "ATTOM property identifier"
+          example: 324388503
+    
+    PropertyAddress:
+      type: object
+      description: "Property address information"
+      properties:
+        country:
+          type: string
+          description: "Country code"
+          example: "US"
+        countrySubd:
+          type: string
+          description: "Country subdivision (state)"
+          example: "FL"
+        line1:
+          type: string
+          description: "Address line 1"
+          example: "3120 BRANDYWINE DR"
+        line2:
+          type: string
+          description: "Address line 2"
+          example: "TALLAHASSEE, FL 32308"
+        locality:
+          type: string
+          description: "City or locality"
+          example: "TALLAHASSEE"
+        matchCode:
+          type: string
+          description: "Address match code"
+          example: "ExaStr"
+        oneLine:
+          type: string
+          description: "Complete address on one line"
+          example: "3120 BRANDYWINE DR, TALLAHASSEE, FL 32308"
+        postal1:
+          type: string
+          description: "Postal code (ZIP)"
+          example: "32308"
+        postal2:
+          type: string
+          description: "ZIP+4 extension"
+          example: "0502"
+        postal3:
+          type: string
+          description: "Postal carrier route"
+          example: "C026"
+    
+    PropertyLocation:
+      type: object
+      description: "Property geographic location information"
+      properties:
+        accuracy:
+          type: string
+          description: "Geocoding accuracy"
+          example: "Rooftop"
+        latitude:
+          type: string
+          description: "Latitude coordinate"
+          example: "30.482269"
+        longitude:
+          type: string
+          description: "Longitude coordinate"
+          example: "-84.252135"
+        distance:
+          type: number
+          description: "Distance from search point in miles"
+          example: 0
+        geoid:
+          type: string
+          description: "Combined geographic identifiers"
+          example: "CO12073, CS1293315, PL1270600, RS0005219792, ZI32308"
+        geoIdV4:
+          type: object
+          description: "V4 geographic identifiers by type"
+          properties:
+            CO:
+              type: string
+              description: "County geoIdV4"
+              example: "de2be45653c1e341fbf88954e9179d8f"
+            CS:
+              type: string
+              description: "County Subdivision geoIdV4"
+              example: "b0cb58f1292e5b001b6f0ddaad78f1aa"
+            DB:
+              type: string
+              description: "School District Boundary geoIdV4"
+              example: "9a2f4e6afaf8f596fc84f75261649308"
+            N2:
+              type: string
+              description: "Neighborhood geoIdV4"
+              example: "6c61abacba0419a7cf2b492fd0c1f80c"
+            PL:
+              type: string
+              description: "Place geoIdV4"
+              example: "d9d648105fd758935b6757927978a6bf"
+            SB:
+              type: string
+              description: "School Attendance Boundary geoIdV4"
+              example: "712b44e372bc317839c7203b976bf0ee"
+            ZI:
+              type: string
+              description: "Zip Code geoIdV4"
+              example: "f6851c16df091613b7a1397cd1de0685"
+    
+    # Property API Response Schemas
+    BasicProfileResponse:
+      type: object
+      description: "Response for property basic profile"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              location:
+                $ref: "#/components/schemas/PropertyLocation"
+              summary:
+                type: object
+                description: "Property summary information"
+                properties:
+                  propclass:
+                    type: string
+                    description: "Property class"
+                    example: "Single Family Residence / Townhouse"
+                  propsubtype:
+                    type: string
+                    description: "Property subtype"
+                    example: "Single Family Residence"
+                  proptype:
+                    type: string
+                    description: "Property type code"
+                    example: "SFR"
+                  propindicator:
+                    type: string
+                    description: "Property indicator"
+                    example: "10"
+                  yearbuilt:
+                    type: integer
+                    description: "Year property was built"
+                    example: 1973
+                  yearbuilteffective:
+                    type: integer
+                    description: "Effective year built (considering renovations)"
+                    example: 1990
+                  stories:
+                    type: number
+                    description: "Number of stories"
+                    example: 1
+                  rooms:
+                    type: integer
+                    description: "Total number of rooms"
+                    example: 7
+                  beds:
+                    type: integer
+                    description: "Number of bedrooms"
+                    example: 3
+                  baths:
+                    type: number
+                    description: "Number of bathrooms"
+                    example: 2.0
+                  universalsize:
+                    type: integer
+                    description: "Universal size in square feet"
+                    example: 1800
+                  sizeInd:
+                    type: string
+                    description: "Size indicator"
+                    example: "LIVING SQFT"
+                  lotsize1:
+                    type: number
+                    description: "Lot size in square feet"
+                    example: 10000
+                  lotsize2:
+                    type: number
+                    description: "Lot size in acres"
+                    example: 0.23
+                  lastsaledate:
+                    type: string
+                    format: date
+                    description: "Date of last sale"
+                    example: "2022-01-15"
+                  lastsaleprice:
+                    type: number
+                    description: "Price of last sale in dollars"
+                    example: 350000
+                  lastsalerecdate:
+                    type: string
+                    format: date
+                    description: "Recording date of last sale"
+                    example: "2022-01-20"
+              building:
+                type: object
+                description: "Building information"
+                properties:
+                  construction:
+                    type: object
+                    description: "Construction details"
+                    properties:
+                      wallType:
+                        type: string
+                        description: "Wall construction type"
+                        example: "WOOD"
+                      roofType:
+                        type: string
+                        description: "Roof construction type"
+                        example: "COMPOSITION SHINGLE"
+                  features:
+                    type: object
+                    description: "Building features"
+                    properties:
+                      cooling:
+                        type: string
+                        description: "Cooling system type"
+                        example: "CENTRAL"
+                      heating:
+                        type: string
+                        description: "Heating system type"
+                        example: "FORCED AIR"
+                      fireplace:
+                        type: boolean
+                        description: "Whether the property has a fireplace"
+                        example: true
+                      pool:
+                        type: boolean
+                        description: "Whether the property has a pool"
+                        example: false
+                      garage:
+                        type: boolean
+                        description: "Whether the property has a garage"
+                        example: true
+                      garageSpaces:
+                        type: number
+                        description: "Number of garage spaces"
+                        example: 2
+              assessment:
+                type: object
+                description: "Assessment information"
+                properties:
+                  assessed:
+                    type: object
+                    description: "Assessed values"
+                    properties:
+                      assdTtlValue:
+                        type: number
+                        description: "Total assessed value"
+                        example: 250000
+                      assdLandValue:
+                        type: number
+                        description: "Assessed land value"
+                        example: 75000
+                      assdImprValue:
+                        type: number
+                        description: "Assessed improvement value"
+                        example: 175000
+              tax:
+                type: object
+                description: "Tax information"
+                properties:
+                  taxAmt:
+                    type: number
+                    description: "Annual tax amount"
+                    example: 3500
+                  taxYear:
+                    type: integer
+                    description: "Tax year"
+                    example: 2022
+              sale:
+                type: object
+                description: "Sale information"
+                properties:
+                  salesHistory:
+                    type: array
+                    description: "Sales history"
+                    items:
+                      type: object
+                      properties:
+                        amount:
+                          type: number
+                          description: "Sale amount in dollars"
+                          example: 350000
+                        saleDate:
+                          type: string
+                          format: date
+                          description: "Date of sale"
+                          example: "2022-01-15"
+                        saleTransType:
+                          type: string
+                          description: "Sale transaction type"
+                          example: "RESALE"
+                        recordingDate:
+                          type: string
+                          format: date
+                          description: "Recording date"
+                          example: "2022-01-20"
+              mortgage:
+                type: object
+                description: "Mortgage information"
+                properties:
+                  FirstConcurrent:
+                    type: object
+                    properties:
+                      amount:
+                        type: number
+                        description: "Mortgage amount"
+                        example: 200000
+    
+    BuildingPermitsResponse:
+      type: object
+      description: "Response for property building permits"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              buildingPermits:
+                type: array
+                description: "List of building permits"
+                items:
+                  type: object
+                  properties:
+                    effectiveDate:
+                      type: string
+                      format: date
+                      description: "Permit effective date"
+                      example: "2009-09-03"
+                    permitNumber:
+                      type: string
+                      description: "Permit number"
+                      example: "TBB091580"
+                    status:
+                      type: string
+                      description: "Permit status"
+                      example: "complete"
+                    description:
+                      type: string
+                      description: "Work description"
+                      example: "11 windows"
+                    jobValue:
+                      type: number
+                      description: "Value of the job in dollars"
+                      example: 2960
+                    fees:
+                      type: number
+                      description: "Permit fees in dollars"
+                      example: 112
+                    businessName:
+                      type: string
+                      description: "Business name of contractor"
+                      example: "Window World OF Tallahassee INC"
+                    classifiers:
+                      type: array
+                      description: "Work classification categories"
+                      items:
+                        type: string
+                      example: ["Doors And Windows"]
+    
+    DetailResponse:
+      type: object
+      description: "Response for property detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              summary:
+                type: object
+                properties:
+                  propType:
+                    type: string
+                    description: "Property type"
+                    example: "SFR"
+                  yearBuilt:
+                    type: integer
+                    description: "Year built"
+                    example: 1973
+              building:
+                type: object
+                properties:
+                  size:
+                    type: object
+                    properties:
+                      universalSize:
+                        type: integer
+                        description: "Universal size in square feet"
+                        example: 2000
+    
+    DetailOwnerResponse:
+      type: object
+      description: "Response for property detail with owner info"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              owner:
+                type: object
+                properties:
+                  owner1:
+                    type: object
+                    properties:
+                      fullName:
+                        type: string
+                        description: "Full name of primary owner"
+                        example: "John Doe"
+    
+    ExpandedProfileResponse:
+      type: object
+      description: "Response for expanded property profile"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              summary:
+                type: object
+                properties:
+                  propType:
+                    type: string
+                    description: "Property type"
+                    example: "SFR"
+              assessment:
+                type: object
+                properties:
+                  assessed:
+                    type: object
+                    properties:
+                      assdTtlValue:
+                        type: integer
+                        description: "Assessed total value"
+                        example: 250000
+    
+    # This schema is used by the property/detailmortgage endpoint
+    PropertyDetailMortgageResponse:
+      type: object
+      description: "Response for property detail with mortgage info"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              mortgage:
+                type: object
+                properties:
+                  FirstConcurrent:
+                    type: object
+                    properties:
+                      amount:
+                        type: integer
+                        description: "Mortgage amount"
+                        example: 200000
+    
+    AssessmentResponse:
+      type: object
+      description: "Response for property assessment"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              assessment:
+                type: object
+                properties:
+                  assessed:
+                    type: object
+                    properties:
+                      assdTtlValue:
+                        type: integer
+                        description: "Assessed total value"
+                        example: 250000
+    
+    AVMResponse:
+      type: object
+      description: "Response for Automated Valuation Model (AVM) data"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              avm:
+                type: object
+                properties:
+                  value:
+                    type: integer
+                    description: "AVM value"
+                    example: 300000
+    
+    SalesHistoryResponse:
+      type: object
+      description: "Response for property sales history"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              salesHistory:
+                type: array
+                description: "List of sales history"
+                items:
+                  type: object
+                  properties:
+                    saleDate:
+                      type: string
+                      format: date
+                      description: "Sale date"
+                      example: "2020-01-01"
+                    salePrice:
+                      type: integer
+                      description: "Sale price"
+                      example: 250000
+    
+    AllEventsResponse:
+      type: object
+      description: "Response for all events related to a property"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              events:
+                type: array
+                description: "List of events"
+                items:
+                  type: object
+                  properties:
+                    eventType:
+                      type: string
+                      description: "Event type"
+                      example: "Sale"
+                    eventDate:
+                      type: string
+                      format: date
+                      description: "Event date"
+                      example: "2020-01-01"
+    
+    AllEventsDetailResponse:
+      type: object
+      description: "Response for all property events detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              assessment:
+                type: object
+                properties:
+                  assessed:
+                    type: object
+                    properties:
+                      assdTtlValue:
+                        type: integer
+                        description: "Assessed total value"
+                        example: 250000
+              avm:
+                type: object
+                properties:
+                  value:
+                    type: integer
+                    description: "AVM value"
+                    example: 300000
+              salesHistory:
+                type: array
+                description: "List of sales history"
+                items:
+                  type: object
+                  properties:
+                    saleDate:
+                      type: string
+                      format: date
+                      description: "Sale date"
+                      example: "2020-01-01"
+                    salePrice:
+                      type: integer
+                      description: "Sale price"
+                      example: 250000
+    
+    AllEventsSnapshotResponse:
+      type: object
+      description: "Response for all property events snapshot"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              assessment:
+                type: object
+                properties:
+                  assessed:
+                    type: object
+                    properties:
+                      assdTtlValue:
+                        type: integer
+                        description: "Assessed total value"
+                        example: 250000
+              avm:
+                type: object
+                properties:
+                  value:
+                    type: integer
+                    description: "AVM value"
+                    example: 300000
+    
+    # Area API Response Schemas
+                
+    CountyLookupResponse:
+      type: object
+      description: "Response for county lookup"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status message"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status message"
+              example: "Success"
+        counties:
+          type: array
+          description: "List of counties in the state"
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: "County ID"
+                example: "CO36061"
+              name:
+                type: string
+                description: "County name"
+                example: "New York County"
+              geoIdV4:
+                type: string
+                description: "Geographic ID (v4)"
+                example: "d9f6b3a8c7e5b4a2d1c3b5a7d9f1e3b5"
+    BoundaryDetailResponse:
+      type: object
+      description: "Response for area boundary detail"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        boundary:
+          type: object
+          properties:
+            geoIdV4:
+              type: string
+              description: "Geographic ID"
+              example: "53205b2ae13a4203456e53ed9d56cfea"
+            type:
+              type: string
+              description: "Boundary type"
+              example: "County"
+            geometry:
+              type: object
+              description: "Boundary geometry in requested format"
+
+    # POI API Response Schemas
+    POISearchResponse:
+      type: object
+      description: "Response for POI search"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code (0: Success, 3: Address Geocoded fail, 5: No POIs within zip code, 100: Invalid parameters)"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        poi:
+          type: array
+          description: "List of points of interest"
+          items:
+            type: object
+            properties:
+              ob_id:
+                type: integer
+                description: "POI ID - unique identifier for the business"
+                example: 12345
+              name:
+                type: string
+                description: "POI name"
+                example: "Local High School"
+              category:
+                type: string
+                description: "Business category"
+                example: "EDUCATION"
+              lineOfBusiness:
+                type: string
+                description: "Line of business"
+                example: "SCHOOLS"
+              primary:
+                type: string
+                description: "Indicates if this is the primary business practice (PRIMARY or OTHER)"
+                example: "PRIMARY"
+              distance:
+                type: number
+                description: "Distance in miles from search point"
+                example: 1.2
+              address:
+                type: string
+                description: "POI address"
+                example: "123 School Drive"
+              city:
+                type: string
+                description: "POI city"
+                example: "Tallahassee"
+              state:
+                type: string
+                description: "POI state"
+                example: "FL"
+              zipCode:
+                type: string
+                description: "POI ZIP code"
+                example: "32308"
+              phone:
+                type: string
+                description: "POI phone number"
+                example: "850-555-1234"
+              latitude:
+                type: number
+                description: "POI latitude"
+                example: 30.4583
+              longitude:
+                type: number
+                description: "POI longitude"
+                example: -84.2807
+                
+    POICategoryLookupResponse:
+      type: object
+      description: "Response for POI category lookup"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        categories:
+          type: array
+          description: "List of business categories"
+          items:
+            type: object
+            properties:
+              industry:
+                type: string
+                description: "Industry name"
+                example: "BIOTECHNOLOGY"
+              category:
+                type: string
+                description: "Business category"
+                example: "HEALTH CARE SERVICES"
+              lineOfBusiness:
+                type: string
+                description: "Line of business"
+                example: "MISC"
+
+    # Community API Response Schemas
+    CommunityProfileResponse:
+      type: object
+      description: "Response for community profile"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code (0: SuccessWithResult, 1: SuccessWithoutResult, -5: InvalidRequestParameter, -6: MissingRequiredParameter)"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        community:
+          type: object
+          properties:
+            demographics:
+              type: object
+              description: "Demographic information"
+              properties:
+                population:
+                  type: object
+                  description: "Population statistics"
+                  properties:
+                    totalPopulation:
+                      type: integer
+                      description: "Total population count"
+                    medianAge:
+                      type: number
+                      description: "Median age of population"
+                    householdCount:
+                      type: integer
+                      description: "Number of households"
+                income:
+                  type: object
+                  description: "Income statistics"
+                  properties:
+                    medianHouseholdIncome:
+                      type: number
+                      description: "Median household income"
+                    averageHouseholdIncome:
+                      type: number
+                      description: "Average household income"
+                    perCapitaIncome:
+                      type: number
+                      description: "Per capita income"
+                ethnicity:
+                  type: object
+                  description: "Ethnicity breakdown"
+                  properties:
+                    percentWhite:
+                      type: number
+                      description: "Percentage of white population"
+                    percentBlack:
+                      type: number
+                      description: "Percentage of black population"
+                    percentHispanic:
+                      type: number
+                      description: "Percentage of Hispanic population"
+                    percentAsian:
+                      type: number
+                      description: "Percentage of Asian population"
+                    percentOther:
+                      type: number
+                      description: "Percentage of other ethnicities"
+            crime:
+              type: object
+              description: "Crime statistics"
+              properties:
+                crimeIndex:
+                  type: number
+                  description: "Overall crime index"
+                violentCrime:
+                  type: object
+                  properties:
+                    total:
+                      type: number
+                      description: "Total violent crime rate"
+                    assault:
+                      type: number
+                      description: "Assault rate"
+                    murder:
+                      type: number
+                      description: "Murder rate"
+                propertyCrime:
+                  type: object
+                  properties:
+                    total:
+                      type: number
+                      description: "Total property crime rate"
+                    burglary:
+                      type: number
+                      description: "Burglary rate"
+                    theft:
+                      type: number
+                      description: "Theft rate"
+            airQuality:
+              type: object
+              description: "Air quality information"
+              properties:
+                airQualityIndex:
+                  type: number
+                  description: "Air quality index"
+                pollutants:
+                  type: object
+                  properties:
+                    ozone:
+                      type: number
+                      description: "Ozone level"
+                    particulateMatter:
+                      type: number
+                      description: "Particulate matter level"
+            naturalDisaster:
+              type: object
+              description: "Natural disaster risk information"
+              properties:
+                earthquakeRisk:
+                  type: number
+                  description: "Earthquake risk index"
+                floodRisk:
+                  type: number
+                  description: "Flood risk index"
+                hurricaneRisk:
+                  type: number
+                  description: "Hurricane risk index"
+                tornadoRisk:
+                  type: number
+                  description: "Tornado risk index"
+            weather:
+              type: object
+              description: "Weather information"
+              properties:
+                annualPrecipitation:
+                  type: number
+                  description: "Annual precipitation in inches"
+                averageTemperature:
+                  type: number
+                  description: "Average annual temperature in Fahrenheit"
+                summerHigh:
+                  type: number
+                  description: "Average summer high temperature"
+                winterLow:
+                  type: number
+                  description: "Average winter low temperature"
+            location:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: "Location name"
+                  example: "Tallahassee"
+                state:
+                  type: string
+                  description: "State code"
+                  example: "FL"
+                county:
+                  type: string
+                  description: "County name"
+                  example: "Leon County"
+                zipCode:
+                  type: string
+                  description: "ZIP code"
+                  example: "32308"
+                geoIdV4:
+                  type: object
+                  description: "Geographic IDs for different area types"
+                  properties:
+                    ND:
+                      type: string
+                      description: "Neighborhood ID"
+                      example: "ecb5529c9c43b6bba49a1087e2189b68"
+                    ZI:
+                      type: string
+                      description: "ZIP code ID"
+                      example: "cc3315052be263ddaa59d3faff0c5dc6"
+                    CS:
+                      type: string
+                      description: "County Subdivision ID"
+                      example: "62e4a45c81aac571f195f83a8ff9a07e"
+                    SB:
+                      type: string
+                      description: "School Attendance Boundary ID"
+                      example: "712b44e372bc317839c7203b976bf0ee"
+    
+    LocationLookupResponse:
+      type: object
+      description: "Response for location lookup"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code (0: SuccessWithResult, 1: SuccessWithoutResult, -5: InvalidRequestParameter, -6: MissingRequiredParameter)"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        locations:
+          type: array
+          description: "List of locations matching the search criteria"
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Location name"
+                example: "Las Vegas"
+              state:
+                type: string
+                description: "State code"
+                example: "NV"
+              county:
+                type: string
+                description: "County name"
+                example: "Clark County"
+              type:
+                type: string
+                description: "Location type (City, County, etc.)"
+                example: "City"
+              geoIdV4:
+                type: string
+                description: "Geographic ID (v4)"
+                example: "dd4ec3218a89807fc1c63dd7265cc1bc"
+
+    # School API Response Schemas
+    SchoolProfileResponse:
+      type: object
+      description: "Response for school profile"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        school:
+          type: object
+          properties:
+            location:
+              type: object
+              properties:
+                geoIdV4:
+                  type: string
+                  description: "Geographic ID v4 for the school"
+                  example: "3defed8585aee270f6b736cb813df875"
+                latitude:
+                  type: number
+                  format: double
+                  description: "School latitude"
+                  example: 30.4521
+                longitude:
+                  type: number
+                  format: double
+                  description: "School longitude"
+                  example: -84.2679
+                addressLine1:
+                  type: string
+                  description: "School street address"
+                  example: "915 Hillcrest Ave"
+                city:
+                  type: string
+                  description: "School city"
+                  example: "Tallahassee"
+                stateCode:
+                  type: string
+                  description: "School state code"
+                  example: "FL"
+                zipCode:
+                  type: string
+                  description: "School ZIP code"
+                  example: "32308"
+                stateFIPs:
+                  type: string
+                  description: "State FIPS code"
+                  example: "12"
+                countyFIPs:
+                  type: string
+                  description: "County FIPS code"
+                  example: "073"
+                countyName:
+                  type: string
+                  description: "County name"
+                  example: "Leon"
+            detail:
+              type: object
+              properties:
+                schoolName:
+                  type: string
+                  description: "School name"
+                  example: "Cobb Middle School"
+                phone:
+                  type: string
+                  description: "School phone number"
+                  example: "8504883364"
+                schoolUrl:
+                  type: string
+                  description: "School website URL"
+                  example: "http://www.leonschools.net"
+                institutionType:
+                  type: string
+                  description: "Type of institution (Public, Private)"
+                  example: "Public"
+                schoolType:
+                  type: string
+                  description: "Type of school (Regular, Special Education, etc.)"
+                  example: "Regular"
+                instructionalLevel:
+                  type: string
+                  description: "Instructional level (Elementary, Middle, High)"
+                  example: "Middle"
+                gradeSpanLow:
+                  type: string
+                  description: "Lowest grade level offered"
+                  example: "6"
+                gradeSpanHigh:
+                  type: string
+                  description: "Highest grade level offered"
+                  example: "8"
+                studentCnt:
+                  type: integer
+                  description: "Student count"
+                  example: 779
+                studentTeacherRatio:
+                  type: number
+                  format: double
+                  description: "Student-teacher ratio"
+                  example: 20.3
+                schoolRating:
+                  type: string
+                  description: "School rating"
+                  example: "D+"
+            testScores:
+              type: array
+              description: "Test scores for the school"
+              items:
+                type: object
+                properties:
+                  year:
+                    type: integer
+                    description: "Test year"
+                    example: 2024
+                  subject:
+                    type: string
+                    description: "Test subject"
+                    example: "ENGLISH LANGUAGE ARTS"
+                  grade:
+                    type: string
+                    description: "Grade level"
+                    example: "06"
+                  score:
+                    type: integer
+                    description: "Test score"
+                    example: 57
+                  institutionType:
+                    type: string
+                    description: "Institution type"
+                    example: "School"
+            district:
+              type: object
+              properties:
+                schoolDistrictGeoId:
+                  type: string
+                  description: "School district geographic ID"
+                  example: "9a2f4e6afaf8f596fc84f75261649308"
+                schoolDistrictName:
+                  type: string
+                  description: "School district name"
+                  example: "Leon County School District"
+                schoolDistrictUrl:
+                  type: string
+                  description: "School district website URL"
+                  example: "http://www.leonschools.net"
+                latitude:
+                  type: number
+                  format: double
+                  description: "District latitude"
+                  example: 30.44064
+                longitude:
+                  type: number
+                  format: double
+                  description: "District longitude"
+                  example: -84.334411
+                phone:
+                  type: string
+                  description: "District phone number"
+                  example: "8504877100"
+                addressLine1:
+                  type: string
+                  description: "District street address"
+                  example: "2757 W Pensacola St"
+                city:
+                  type: string
+                  description: "District city"
+                  example: "Tallahassee"
+                stateCode:
+                  type: string
+                  description: "District state code"
+                  example: "FL"
+
+    SchoolDistrictResponse:
+      type: object
+      description: "Response for school district"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        district:
+          type: object
+          properties:
+            location:
+              type: object
+              properties:
+                geoIdV4:
+                  type: string
+                  description: "Geographic ID v4 for the district"
+                  example: "9a2f4e6afaf8f596fc84f75261649308"
+                latitude:
+                  type: number
+                  format: double
+                  description: "District latitude"
+                  example: 30.44064
+                longitude:
+                  type: number
+                  format: double
+                  description: "District longitude"
+                  example: -84.334411
+                addressLine1:
+                  type: string
+                  description: "District street address"
+                  example: "2757 W Pensacola St"
+                city:
+                  type: string
+                  description: "District city"
+                  example: "Tallahassee"
+                stateCode:
+                  type: string
+                  description: "District state code"
+                  example: "FL"
+                zipCode:
+                  type: string
+                  description: "District ZIP code"
+                  example: "32304"
+                stateFIPs:
+                  type: string
+                  description: "State FIPS code"
+                  example: "12"
+                countyFIPs:
+                  type: string
+                  description: "County FIPS code"
+                  example: "073"
+                countyName:
+                  type: string
+                  description: "County name"
+                  example: "Leon"
+            detail:
+              type: object
+              properties:
+                schoolDistrictName:
+                  type: string
+                  description: "School district name"
+                  example: "Leon County School District"
+                phone:
+                  type: string
+                  description: "District phone number"
+                  example: "8504877100"
+                schoolDistrictUrl:
+                  type: string
+                  description: "District website URL"
+                  example: "http://www.leonschools.net"
+                status:
+                  type: string
+                  description: "District status"
+                  example: "Operational"
+                level:
+                  type: string
+                  description: "District level"
+                  example: "Unified"
+                gradeSpanLow:
+                  type: string
+                  description: "Lowest grade level offered"
+                  example: "PK"
+                gradeSpanHigh:
+                  type: string
+                  description: "Highest grade level offered"
+                  example: "12"
+                schoolCnt:
+                  type: integer
+                  description: "Number of schools in the district"
+                  example: 57
+                studentCnt:
+                  type: integer
+                  description: "Total student count"
+                  example: 32845
+                schoolDistrictRating:
+                  type: string
+                  description: "School district rating"
+                  example: "C+"
+            testScores:
+              type: array
+              description: "Test scores for the district"
+              items:
+                type: object
+                properties:
+                  year:
+                    type: integer
+                    description: "Test year"
+                    example: 2024
+                  subject:
+                    type: string
+                    description: "Test subject"
+                    example: "ENGLISH LANGUAGE ARTS"
+                  grade:
+                    type: string
+                  description: "Grade level"
+                  example: "03"
+                  score:
+                    type: integer
+                    description: "Test score"
+                    example: 55
+                  institutionType:
+                    type: string
+                    description: "Institution type"
+                    example: "District"
+
+    SchoolSearchResponse:
+      type: object
+      description: "Response for school search"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        schools:
+          type: array
+          items:
+            type: object
+            properties:
+              geoIdV4:
+                type: string
+                description: "School geographic ID"
+                example: "712b44e372bc317839c7203b976bf0ee"
+              name:
+                type: string
+                description: "School name"
+                example: "Example High School"
+              distance:
+                type: number
+                description: "Distance in miles"
+                example: 1.5
+
+    # Sales Comparables Response Schema
+    SalesComparablesResponse:
+      type: object
+      description: "Response for sales comparables"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        target:
+          type: object
+          description: "Target property information"
+          properties:
+            identifier:
+              $ref: "#/components/schemas/PropertyIdentifier"
+            address:
+              $ref: "#/components/schemas/PropertyAddress"
+            location:
+              $ref: "#/components/schemas/PropertyLocation"
+            summary:
+              type: object
+              description: "Property summary information"
+              required: ["proptype", "yearbuilt", "universalsize"]
+              properties:
+                propclass:
+                  type: string
+                  description: "Property class"
+                  example: "Single Family Residence / Townhouse"
+                propsubtype:
+                  type: string
+                  description: "Property subtype"
+                  example: "Single Family Residence"
+                proptype:
+                  type: string
+                  description: "Property type code"
+                  example: "SFR"
+                yearbuilt:
+                  type: integer
+                  description: "Year property was built"
+                  example: 1973
+                bedrooms:
+                  type: integer
+                  description: "Number of bedrooms"
+                  example: 3
+                bathrooms:
+                  type: number
+                  description: "Number of bathrooms"
+                  example: 2.0
+                universalsize:
+                  type: integer
+                  description: "Universal size in square feet"
+                  example: 1800
+                lotsize1:
+                  type: number
+                  description: "Lot size in square feet"
+                  example: 10000
+            sale:
+              type: object
+              description: "Sale information"
+              properties:
+                saleDate:
+                  type: string
+                  format: date
+                  description: "Date of sale"
+                  example: "2022-01-15"
+                amount:
+                  type: number
+                  description: "Sale amount in dollars"
+                  example: 350000
+                distressedSale:
+                  type: boolean
+                  description: "Whether this was a distressed sale"
+                  example: false
+        comparables:
+          type: array
+          description: "List of comparable properties"
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              location:
+                $ref: "#/components/schemas/PropertyLocation"
+              summary:
+                type: object
+                description: "Property summary information"
+                properties:
+                  propclass:
+                    type: string
+                    description: "Property class"
+                    example: "Single Family Residence / Townhouse"
+                  propsubtype:
+                    type: string
+                    description: "Property subtype"
+                    example: "Single Family Residence"
+                  proptype:
+                    type: string
+                    description: "Property type code"
+                    example: "SFR"
+                  yearbuilt:
+                    type: integer
+                    description: "Year property was built"
+                    example: 1975
+                  bedrooms:
+                    type: integer
+                    description: "Number of bedrooms"
+                    example: 3
+                  bathrooms:
+                    type: number
+                    description: "Number of bathrooms"
+                    example: 2.0
+                  universalsize:
+                    type: integer
+                    description: "Universal size in square feet"
+                    example: 1750
+                  lotsize1:
+                    type: number
+                    description: "Lot size in square feet"
+                    example: 9500
+              sale:
+                type: object
+                description: "Sale information"
+                properties:
+                  saleDate:
+                    type: string
+                    format: date
+                    description: "Date of sale"
+                    example: "2022-03-10"
+                  amount:
+                    type: number
+                    description: "Sale amount in dollars"
+                    example: 345000
+                  distressedSale:
+                    type: boolean
+                    description: "Whether this was a distressed sale"
+                    example: false
+              distance:
+                type: number
+                description: "Distance from target property in miles"
+                example: 0.8
+              similarity:
+                type: number
+                description: "Similarity score (0-100)"
+                example: 85
+
+    # Transaction API Response Schemas
+    SalesTrendResponse:
+      type: object
+      description: "Response for sales trend data"
+      properties:
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Status code"
+              example: "0"
+            long_description:
+              type: string
+              description: "Detailed status description"
+              example: "Your request was successfully processed."
+            short_description:
+              type: string
+              description: "Brief status description"
+              example: "Success"
+        salesTrend:
+          type: object
+          properties:
+            geoIdV4:
+              type: string
+              description: "Neighborhood geographic ID"
+              example: "6c61abacba0419a7cf2b492fd0c1f80c"
+            interval:
+              type: string
+              description: "Time interval for sales trends"
+              example: "yearly"
+            startYear:
+              type: integer
+              description: "Start year for sales trends"
+              example: 2020
+            endYear:
+              type: integer
+              description: "End year for sales trends"
+              example: 2025
+            propertyType:
+              type: string
+              description: "Property type filter"
+              example: "ALL"
+            transferType:
+              type: string
+              description: "Transfer type filter"
+              example: "default"
+            salesData:
+              type: array
+              description: "List of sales data points"
+              items:
+                type: object
+                properties:
+                  year:
+                    type: integer
+                    description: "Year of sales data"
+                    example: 2020
+                  salesCount:
+                    type: integer
+                    description: "Number of sales in the year"
+                    example: 100
+                  medianSalesPrice:
+                    type: number
+                    description: "Median sales price in the year"
+                    example: 250000
+                  averageSalesPrice:
+                    type: number
+                    description: "Average sales price in the year"
+                    example: 275000
+
+    # Transportation API Response Schemas
+    TransportationNoiseResponse:
+      type: object
+      description: "Response for transportation noise data"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        transportationNoise:
+          type: object
+          properties:
+            attomId:
+              type: integer
+              description: "ATTOM property ID"
+              example: 324388503
+            lat:
+              type: number
+              format: double
+              description: "Latitude coordinate"
+              example: 30.48228
+            lon:
+              type: number
+              format: double
+              description: "Longitude coordinate"
+              example: -84.25205
+            road_noise:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  description: "Noise level (0-5 scale)"
+                  example: 1
+                level_description:
+                  type: string
+                  description: "Description of noise level"
+                  example: "Occasional cars to light traffic"
+                noise_sources:
+                  type: array
+                  description: "List of noise sources"
+                  items:
+                    type: object
+                    properties:
+                      source_type:
+                        type: string
+                        description: "Type of noise source"
+                        example: "road"
+                      source_sub_type:
+                        type: string
+                        description: "Sub-type of noise source"
+                        example: "residential"
+                      source_description:
+                        type: string
+                        description: "Description of noise source"
+                        example: "Brandywine Drive"
+            aviation_noise:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  description: "Noise level (0-5 scale)"
+                  example: 0
+                level_description:
+                  type: string
+                  description: "Description of noise level"
+                  example: "No nearby airports"
+            emg_vehicle_noise:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  description: "Noise level (0-5 scale)"
+                  example: 0
+                level_description:
+                  type: string
+                  description: "Description of noise level"
+                  example: "No known emergency vehicle stations nearby"
+                noise_sources:
+                  type: array
+                  description: "List of noise sources"
+                  items:
+                    type: object
+            rail_whistle_noise:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  description: "Noise level (0-5 scale)"
+                  example: 0
+                level_description:
+                  type: string
+                  description: "Description of noise level"
+                  example: "There aren't any train crossings with whistles nearby"
+                noise_sources:
+                  type: array
+                  description: "List of noise sources"
+                  items:
+                    type: object
+            rail_noise:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  description: "Noise level (0-5 scale)"
+                  example: 0
+                level_description:
+                  type: string
+                  description: "Description of noise level"
+                  example: "Quiet"
+                noise_sources:
+                  type: array
+                  description: "List of noise sources"
+                  items:
+                    type: object
+                    properties:
+                      source_type:
+                        type: string
+                        description: "Type of noise source"
+                        example: "rail"
+                      source_sub_type:
+                        type: string
+                        description: "Sub-type of noise source"
+                        example: "rail"
+                      source_description:
+                        type: string
+                        description: "Description of noise source"
+                        example: "Florida Gulf & Atlantic Railroad"
+            overall_summary:
+              type: string
+              description: "Overall summary of noise environment"
+              example: "Traffic noise is relatively low."
+            disclaimer_text:
+              type: string
+              description: "Disclaimer text"
+              example: "  OpenStreetMap contributors"
+
+    SaleSnapshotResponse:
+      type: object
+      description: "Response for sales snapshot"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        sales:
+          type: array
+          description: "List of sales"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    SaleDetailResponse:
+      type: object
+      description: "Response for sales detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        sales:
+          type: array
+          description: "List of sales"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    SalesHistorySnapshotResponse:
+      type: object
+      description: "Response for sales history snapshot"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        salesHistory:
+          type: array
+          description: "List of sales history"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    SalesHistoryBasicResponse:
+      type: object
+      description: "Response for sales history basic"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        salesHistory:
+          type: array
+          description: "List of sales history"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    SalesHistoryExpandedResponse:
+      type: object
+      description: "Response for sales history expanded"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        salesHistory:
+          type: array
+          description: "List of sales history"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    SalesHistoryDetailResponse:
+      type: object
+      description: "Response for sales history detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        salesHistory:
+          type: array
+          description: "List of sales history"
+          items:
+            type: object
+            properties:
+              saleDate:
+                type: string
+                format: date
+                description: "Sale date"
+                example: "2020-01-01"
+              salePrice:
+                type: integer
+                description: "Sale price"
+                example: 250000
+
+    AssessmentDetailResponse:
+      type: object
+      description: "Response for assessment detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        assessment:
+          type: array
+          items:
+            type: object
+            properties:
+              assessed:
+                type: object
+                properties:
+                  assdTtlValue:
+                    type: integer
+                    description: "Assessed total value"
+                    example: 250000
+
+    AssessmentHistoryDetailResponse:
+      type: object
+      description: "Response for assessment history detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        assessmentHistory:
+          type: array
+          description: "List of assessment history"
+          items:
+            type: object
+            properties:
+              assessmentDate:
+                type: string
+                format: date
+                description: "Assessment date"
+                example: "2020-01-01"
+              assessedValue:
+                type: integer
+                description: "Assessed value"
+                example: 250000
+
+    AvmDetailResponse:
+      type: object
+      description: "Response for AVM detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        avm:
+          type: array
+          items:
+            type: object
+            properties:
+              attomId:
+                type: integer
+                description: "ATTOM property ID"
+                example: 324388503
+              value:
+                type: integer
+                description: "AVM value"
+                example: 300000
+
+    AvmHistoryDetailResponse:
+      type: object
+      description: "Response for AVM history detail"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        avmHistory:
+          type: array
+          description: "List of AVM history"
+          items:
+            type: object
+            properties:
+              avmDate:
+                type: string
+                format: date
+                description: "AVM date"
+                example: "2020-01-01"
+              avmValue:
+                type: integer
+                description: "AVM value"
+                example: 300000
+
+    PropertyDetailWithSchoolsResponse:
+      type: object
+      description: "Response for property details with schools"
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        property:
+          type: array
+          items:
+            type: object
+            properties:
+              identifier:
+                $ref: "#/components/schemas/PropertyIdentifier"
+              address:
+                $ref: "#/components/schemas/PropertyAddress"
+              schools:
+                type: array
+                description: "List of schools"
+                items:
+                  type: object
+                  properties:
+                    schoolId:
+                      type: string
+                      description: "School ID"
+                      example: "12345"
+                    schoolName:
+                      type: string
+                      description: "School name"
+                      example: "Example High School"
+                    schoolType:
+                      type: string
+                      description: "School type"
+                      example: "High School"
+                    schoolLevel:
+                      type: string
+                      description: "School level"
+                      example: "9-12"
+                    schoolDistrict:
+                      type: string
+                      description: "School district"
+                      example: "Example School District"
+                    distance:
+                      type: number
+                      description: "Distance from property in miles"
+                      example: 1.5
