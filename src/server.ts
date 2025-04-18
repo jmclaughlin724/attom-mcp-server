@@ -9,8 +9,8 @@
 import express from 'express';
 import cors from 'cors';
 import { AttomService } from './services/attomService';
-// Import only what we use
-import { executeQuery } from './services/queryManager';
+// Import what we need from queryManager
+import { executeQuery, applyAddressToGeoIdFallback } from './services/queryManager';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -184,12 +184,25 @@ app.post('/mcp/get_geographic_boundary', async (req, res) => {
 // MCP endpoint for school profile
 app.post('/mcp/get_school_profile', async (req, res) => {
   try {
-    const { geoIdV4 } = req.body;
+    let { geoIdV4, address, address1, address2 } = req.body;
+    
+    // Try to convert address to geoIdV4 if needed
+    if (!geoIdV4 && (address || (address1 && address2))) {
+      try {
+        // Use the address-to-geoIdV4 fallback to get a geoIdV4 code
+        const params = { address, address1, address2 };
+        const updatedParams = await applyAddressToGeoIdFallback('schoolProfile', params);
+        geoIdV4 = updatedParams.geoIdV4;
+        console.log(`[SchoolProfile] Converted address to geoIdV4: ${geoIdV4}`);
+      } catch (conversionError) {
+        console.warn(`[SchoolProfile] Failed to convert address to geoIdV4: ${conversionError}`);
+      }
+    }
     
     // Validate parameters based on YAML requirements
     if (!geoIdV4) {
       return res.status(400).json({
-        error: 'Missing required parameter: geoIdV4 is required',
+        error: 'Missing required parameter: geoIdV4 is required (or valid address to convert)',
         status: 'error'
       });
     }
@@ -208,12 +221,25 @@ app.post('/mcp/get_school_profile', async (req, res) => {
 // MCP endpoint for school district
 app.post('/mcp/get_school_district', async (req, res) => {
   try {
-    const { geoIdV4 } = req.body;
+    let { geoIdV4, address, address1, address2 } = req.body;
+    
+    // Try to convert address to geoIdV4 if needed
+    if (!geoIdV4 && (address || (address1 && address2))) {
+      try {
+        // Use the address-to-geoIdV4 fallback to get a geoIdV4 code
+        const params = { address, address1, address2 };
+        const updatedParams = await applyAddressToGeoIdFallback('schoolDistrict', params);
+        geoIdV4 = updatedParams.geoIdV4;
+        console.log(`[SchoolDistrict] Converted address to geoIdV4: ${geoIdV4}`);
+      } catch (conversionError) {
+        console.warn(`[SchoolDistrict] Failed to convert address to geoIdV4: ${conversionError}`);
+      }
+    }
     
     // Validate parameters based on YAML requirements
     if (!geoIdV4) {
       return res.status(400).json({
-        error: 'Missing required parameter: geoIdV4 is required',
+        error: 'Missing required parameter: geoIdV4 is required (or valid address to convert)',
         status: 'error'
       });
     }

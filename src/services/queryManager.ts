@@ -15,6 +15,7 @@ import {
   AllEventsDataField
 } from '../config/endpointConfig';
 import { fallbackAttomIdFromAddressCached, fallbackGeoIdV4SubtypeCached } from '../utils/fallback';
+import { getSalesDateRange, getSalesTrendYearRange } from '../utils/dateUtils';
 
 // Queue for tracking in-flight requests
 const requestQueue: Map<string, Promise<any>> = new Map();
@@ -166,31 +167,90 @@ async function applyAddressToAttomIdFallback(
 
 /**
  * Apply address-to-geoid fallback strategy
+ * @param endpointKey Endpoint key to determine preferred geocode subtype
  * @param params Request parameters
  * @returns Updated parameters with geoIdV4
  */
-async function applyAddressToGeoIdFallback(
+export async function applyAddressToGeoIdFallback(
+  endpointKey: string,
   params: Record<string, any>
 ): Promise<Record<string, any>> {
   const updatedParams = { ...params };
   
-  if (!updatedParams.geoIdV4 && 
-      (updatedParams.address || (updatedParams.address1 && updatedParams.address2))) {
-    
-    const address1 = updatedParams.address1 ?? updatedParams.address;
-    const address2 = updatedParams.address2 ?? '';
-    const cacheKey = `${address1}|${address2}`;
-    
-    updatedParams.geoIdV4 = await fallbackGeoIdV4SubtypeCached(
-      address1,
-      address2,
-      'N2', // Using N2 for neighborhood data
-      cacheKey,
-      true // Enable Google normalization
-    );
+  // Skip processing if geoIdV4 is already present or no address is provided
+  if (updatedParams.geoIdV4 || 
+      !(updatedParams.address || (updatedParams.address1 && updatedParams.address2))) {
+    return updatedParams;
   }
   
+  const config = getEndpointConfig(endpointKey);
+  const preferredSubtype = config.preferredGeoIdSubtype ?? 'N2';
+  
+  const address1 = updatedParams.address1 ?? updatedParams.address;
+  const address2 = updatedParams.address2 ?? '';
+  const cacheKey = `${address1}|${address2}`;
+  
+  console.log(`[GeoIdFallback] Using ${preferredSubtype} subtype for ${endpointKey}`);
+  
+  let geoIdV4 = await fallbackGeoIdV4SubtypeCached(
+    address1,
+    address2,
+    preferredSubtype,
+    cacheKey,
+    true // Enable Google normalization
+  );
+  
+  // Process comma-separated geoIdV4 values
+  updatedParams.geoIdV4 = processGeoIdV4(geoIdV4, preferredSubtype);
+  
   return updatedParams;
+}
+
+/**
+ * Process and select the appropriate geoIdV4 from a potentially comma-separated list
+ * @param geoIdV4 The raw geoIdV4 string from the API
+ * @param preferredSubtype The preferred subtype to select
+ * @returns A single geoIdV4 value
+ */
+function processGeoIdV4(geoIdV4: string, preferredSubtype: string): string {
+  if (!geoIdV4?.includes(',')) {
+    return geoIdV4;
+  }
+  
+  const geoIdList = geoIdV4.split(',').map(id => id.trim());
+  let selectedGeoId = geoIdList[0]; // Default to first one
+  
+  // Select the appropriate geoId based on the preferred subtype
+  const subtypePatterns = getSubtypePatterns();
+  const patterns = subtypePatterns[preferredSubtype];
+  
+  if (patterns?.length) {
+    // Find the first geoId that matches any of the patterns for this subtype
+    const matchingGeoId = geoIdList.find(id => 
+      patterns.some(pattern => id.startsWith(pattern))
+    );
+    
+    if (matchingGeoId) {
+      selectedGeoId = matchingGeoId;
+      console.log(`[GeoIdFallback] Selected ${preferredSubtype} geoIdV4: ${selectedGeoId}`);
+    }
+  }
+  
+  return selectedGeoId;
+}
+
+/**
+ * Get pattern prefixes for different geoIdV4 subtypes
+ * @returns A map of subtype to pattern prefixes
+ */
+function getSubtypePatterns(): Record<string, string[]> {
+  return {
+    'SB': ['ccd2bc', '786e30', 'a1cc1b'],  // School-related geoIds
+    'DB': ['ea629d'],                       // Database geoIds
+    'ZI': ['9df4a0'],                       // ZIP code geoIds
+    'N2': [],                               // Default neighborhood
+    'N4': []                                // Detailed neighborhood
+  };
 }
 
 /**
@@ -250,7 +310,7 @@ async function applyFallbackStrategy(
       break;
       
     case FallbackStrategy.ADDRESS_TO_GEOID:
-      updatedParams = await applyAddressToGeoIdFallback(updatedParams);
+      updatedParams = await applyAddressToGeoIdFallback(endpointKey, updatedParams);
       break;
       
     case FallbackStrategy.ATTOMID_TO_ID:
@@ -259,6 +319,48 @@ async function applyFallbackStrategy(
   }
   
   return { updatedParams, dataFromAllEvents };
+}
+
+/**
+ * Apply automatic date parameters based on endpoint
+ * @param endpointKey Endpoint key
+ * @param params Original parameters
+ * @returns Updated parameters with date calculations
+ */
+function applyDateParameters(
+  endpointKey: string,
+  params: Record<string, any>
+): Record<string, any> {
+  // Clone the original params
+  const updatedParams = { ...params };
+  
+  // Apply date calculations based on endpoint
+  switch (endpointKey) {
+    case 'saleSnapshot':
+      // If either date is missing, calculate both to ensure consistency
+      if (!updatedParams.startsalesearchdate || !updatedParams.endsalesearchdate) {
+        const { startDate, endDate } = getSalesDateRange();
+        updatedParams.startsalesearchdate = startDate;
+        updatedParams.endsalesearchdate = endDate;
+        console.log(`[DateCalc] Using calculated date range for saleSnapshot: ${startDate} to ${endDate}`);
+      }
+      break;
+      
+    case 'transactionSalesTrend':
+      // Add interval if not provided (default to yearly) using nullish coalescing operator
+      updatedParams.interval ??= 'yearly';
+      
+      // If either year is missing, calculate both to ensure consistency
+      if (!updatedParams.startyear || !updatedParams.endyear) {
+        const { startYear, endYear } = getSalesTrendYearRange();
+        updatedParams.startyear = startYear;
+        updatedParams.endyear = endYear;
+        console.log(`[DateCalc] Using calculated year range for transactionSalesTrend: ${startYear} to ${endYear}`);
+      }
+      break;
+  }
+  
+  return updatedParams;
 }
 
 /**
@@ -274,21 +376,38 @@ export async function executeQuery(
   // Get endpoint configuration
   const config = getEndpointConfig(endpointKey);
   
+  // Apply automatic date parameters
+  const paramsWithDates = applyDateParameters(endpointKey, params);
+  
+  // Check if we have address parameters but no geoIdV4
+  // This allows address-to-geoIdV4 conversion even when not specified in the fallback strategy
+  let enhancedParams = { ...paramsWithDates };
+  if (!enhancedParams.geoIdV4 && 
+      (enhancedParams.address || (enhancedParams.address1 && enhancedParams.address2))) {
+    // Try to apply address-to-geoIdV4 conversion regardless of fallback strategy
+    try {
+      enhancedParams = await applyAddressToGeoIdFallback(endpointKey, enhancedParams);
+      console.log(`[AddressFallback] Applied address-to-geoIdV4 conversion for ${endpointKey}`);
+    } catch (error) {
+      console.warn(`[AddressFallback] Failed to convert address to geoIdV4: ${error}`);
+    }
+  }
+  
   // Generate cache key for deduplication
-  const cacheKey = generateCacheKey(endpointKey, params);
+  const cacheKey = generateCacheKey(endpointKey, enhancedParams);
   
   // Check if request is already in flight
   const existingRequest = requestQueue.get(cacheKey);
   if (existingRequest) {
-    console.log(`Request already in flight for ${cacheKey}, reusing promise`);
+    console.log(`[Cache] Request already in flight for ${endpointKey}`);
     return existingRequest;
   }
   
-  // Create new request promise
+  // Create request promise
   const requestPromise = (async () => {
     try {
       // Apply fallback strategy to get missing parameters
-      const { updatedParams, dataFromAllEvents } = await applyFallbackStrategy(endpointKey, params);
+      const { updatedParams, dataFromAllEvents } = await applyFallbackStrategy(endpointKey, enhancedParams);
       
       // If we got data from AllEvents, return it directly
       if (dataFromAllEvents) {
