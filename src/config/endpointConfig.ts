@@ -97,7 +97,7 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
  */
 const DEFAULT_CACHE: CacheConfig = {
   ttlSeconds: 3600, // 1 hour
-  useRedis: true,
+  useRedis: false,
   useMemory: true,
 };
 
@@ -106,7 +106,7 @@ const DEFAULT_CACHE: CacheConfig = {
  */
 const PROPERTY_CACHE: CacheConfig = {
   ttlSeconds: 86400, // 24 hours
-  useRedis: true,
+  useRedis: false,
   useMemory: true,
 };
 
@@ -115,7 +115,7 @@ const PROPERTY_CACHE: CacheConfig = {
  */
 const VOLATILE_CACHE: CacheConfig = {
   ttlSeconds: 900, // 15 minutes
-  useRedis: true,
+  useRedis: false,
   useMemory: true,
 };
 

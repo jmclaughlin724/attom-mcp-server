@@ -40,7 +40,7 @@ export async function fetchAttom(
       if (!res.ok) {
         throw new Error(`Attom error ${res.status}: ${res.statusText}`);
       }
-      const data = await res.json() as any;
+      const data = await res.json() as Record<string, any>;
       // Check for API-level errors in the response
       if (data.status && data.status.code !== 0 && data.status.code !== '0') {
         throw new Error(`ATTOM API error: ${data.status.code} - ${data.status.msg ?? 'Unknown error'}`);

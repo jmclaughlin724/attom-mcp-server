@@ -1,7 +1,7 @@
 // src/mcp_tools.ts
 import { z } from 'zod';
-import { normalizeAddressStringForAttom } from './utils/googlePlaces';
-import { fetchAttom } from './utils/fetcher';
+import { normalizeAddressStringForAttom } from './utils/googlePlaces.js';
+import { fetchAttom } from './utils/fetcher.js';
 
 /**
  * MCP tool for Google Places address normalization and ATTOM API integration

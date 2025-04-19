@@ -4,8 +4,8 @@
  * This file registers the ATTOM API tools with the MCP framework.
  */
 
-import { AttomService } from '../services/attomService';
-import { executeQuery } from '../services/queryManager';
+import { AttomService } from '../services/attomService.js';
+import { executeQuery } from '../services/queryManager.js';
 
 // Create ATTOM service instance
 const attomService = new AttomService();

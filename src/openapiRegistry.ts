@@ -47,33 +47,51 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Property basic profile data',
-      schema: z.any().describe('BasicProfileResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('BasicProfileResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '404': {
       description: 'Not Found - Property not found',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -103,33 +121,51 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Sales comparables data',
-      schema: z.any().describe('SalesComparablesResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SalesComparablesResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '404': {
       description: 'Not Found - Property not found',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['Sale'],
@@ -154,33 +190,51 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Sales comparables data',
-      schema: z.any().describe('SalesComparablesResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SalesComparablesResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '404': {
       description: 'Not Found - Property not found',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['Sale'],
@@ -200,33 +254,51 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Community profile data',
-      schema: z.any().describe('CommunityResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('CommunityResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '404': {
       description: 'Not Found - Community not found',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['Community'],
@@ -246,33 +318,51 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'School profile data',
-      schema: z.any().describe('SchoolProfileResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SchoolProfileResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '404': {
       description: 'Not Found - School not found',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['School'],
@@ -294,28 +384,43 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'School search data',
-      schema: z.any().describe('SchoolSearchResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SchoolSearchResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['School'],
@@ -339,28 +444,43 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'POI search data',
-      schema: z.any().describe('POISearchResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('POISearchResponse'),
+        },
+      },
     },
     '400': {
       description: 'Bad Request - Invalid parameters',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '401': {
       description: 'Unauthorized - Invalid or missing API key',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '429': {
       description: 'Too Many Requests - Rate limit exceeded',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
     '500': {
       description: 'Internal Server Error',
-      schema: errorSchema,
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
     },
   },
   tags: ['POI'],
@@ -374,8 +494,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Property building permits data',
-      schema: z.any().describe('BuildingPermitsResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('BuildingPermitsResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -390,8 +513,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Property detail owner data',
-      schema: z.any().describe('DetailOwnerResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('DetailOwnerResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -406,8 +532,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Property detail mortgage data',
-      schema: z.any().describe('DetailMortgageResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('DetailMortgageResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -422,8 +551,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Property detail mortgage owner data',
-      schema: z.any().describe('DetailMortgageOwnerResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('DetailMortgageOwnerResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -438,8 +570,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'AVM detail data',
-      schema: z.any().describe('AttomAvmResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('AttomAvmResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -454,8 +589,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Home equity data',
-      schema: z.any().describe('HomeEquityResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('HomeEquityResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -470,8 +608,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Rental AVM data',
-      schema: z.any().describe('RentalAvmResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('RentalAvmResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -486,8 +627,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Assessment detail data',
-      schema: z.any().describe('AssessmentDetailResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('AssessmentDetailResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -502,8 +646,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Sales history snapshot data',
-      schema: z.any().describe('SaleshistorySnapshotResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleshistorySnapshotResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -516,8 +663,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Basic deed + mortgage history data',
-      schema: z.any().describe('SaleshistoryBasicResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleshistoryBasicResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -530,8 +680,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Expanded deed + mortgage + preforeclosure data',
-      schema: z.any().describe('SaleshistoryExpandedResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleshistoryExpandedResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -544,8 +697,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Sale history detail data',
-      schema: z.any().describe('SaleshistoryDetailResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleshistoryDetailResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -560,8 +716,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Last sale data',
-      schema: z.any().describe('SaleDetailResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleDetailResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -582,8 +741,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Sale info data',
-      schema: z.any().describe('SaleSnapshotResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SaleSnapshotResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -604,8 +766,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'All event detail data',
-      schema: z.any().describe('AlleventsDetailResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('AlleventsDetailResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -624,8 +789,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'All event snapshot data',
-      schema: z.any().describe('AlleventsSnapshotResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('AlleventsSnapshotResponse'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -664,8 +832,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Comparable sales data',
-      schema: z.any().describe('SalesComparablesAddressResp'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SalesComparablesAddressResp'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -696,8 +867,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Comparable sales data',
-      schema: z.any().describe('SalesComparablesPropidResp'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SalesComparablesPropidResp'),
+        },
+      },
     },
   },
   tags: ['Property'],
@@ -723,8 +897,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Boundaries data',
-      schema: z.any().describe('AreaBoundaryDetailResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('AreaBoundaryDetailResponse'),
+        },
+      },
     },
   },
   tags: ['Area'],
@@ -748,8 +925,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Points of interest data',
-      schema: z.any().describe('PoiSearchResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('PoiSearchResponse'),
+        },
+      },
     },
   },
   tags: ['POI'],
@@ -770,8 +950,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'Community profile data',
-      schema: z.any().describe('CommunityProfileResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('CommunityProfileResponse'),
+        },
+      },
     },
   },
   tags: ['Community'],
@@ -792,8 +975,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'School profile data',
-      schema: z.any().describe('SchoolProfileResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SchoolProfileResponse'),
+        },
+      },
     },
   },
   tags: ['School'],
@@ -814,8 +1000,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'School district data',
-      schema: z.any().describe('SchoolDistrictResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SchoolDistrictResponse'),
+        },
+      },
     },
   },
   tags: ['School'],
@@ -839,8 +1028,11 @@ openApiRegistry.registerPath({
   responses: {
     '200': {
       description: 'School search data',
-      schema: z.any().describe('SchoolSearchResponse'),
-      mediaType: 'application/json',
+      content: {
+        'application/json': {
+          schema: z.any().describe('SchoolSearchResponse'),
+        },
+      },
     },
   },
   tags: ['School'],

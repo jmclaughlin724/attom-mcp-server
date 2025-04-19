@@ -35,8 +35,6 @@ x-mcp-caching:
   strategies:
     - type: "memory"
       max-size: "1GB"
-    - type: "redis"
-      connection: "redis://localhost:6379"
   endpoints:
     # Property endpoints - moderate caching (properties change less frequently)
     "/propertyapi/v1.0.0/property/detail": 

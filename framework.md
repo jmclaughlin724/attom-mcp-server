@@ -18,7 +18,7 @@ attom_mcp/
 │   │   └── queryManager.ts       # Query management
 │   └── utils/
 │       ├── fetcher.ts            # HTTP request utility
-│       ├── caching.ts            # Caching mechanisms
+│       ├── caching.ts            # In-memory caching mechanisms
 │       ├── fallback.ts           # Fallback strategies
 │       └── googlePlaces.ts       # Google Places API integration
 ├── openapi/
@@ -52,7 +52,7 @@ attom_mcp/
 
 ### Utilities
 
-- `utils/caching.ts`: In-memory and Redis caching mechanisms
+- `utils/caching.ts`: In-memory caching mechanisms
 - `utils/fallback.ts`: Fallback strategies for API requests
 - `utils/fetcher.ts`: HTTP request utility with error handling
 - `utils/googlePlaces.ts`: Google Places API integration for address resolution

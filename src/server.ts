@@ -6,34 +6,47 @@
  * maintaining the CLI interface.
  */
 
-import express from 'express';
-import cors from 'cors';
-import { AttomService } from './services/attomService';
+import express, { Request, Response, Router, NextFunction, Express } from 'express';
+import { AttomService } from './services/attomService.js';
 // Import what we need from queryManager
-import { executeQuery, applyAddressToGeoIdFallback } from './services/queryManager';
+import { executeQuery, applyAddressToGeoIdFallback } from './services/queryManager.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
 
 // Create Express app
-const app = express();
+const app: Express = express();
+const router = Router();
 const PORT = process.env.PORT ?? 3000;
 
 // Create ATTOM service instance
 const attomService = new AttomService();
 
+// Centralized error handler to reduce verbosity
+const handleError = (res: express.Response, error: unknown) => {
+  // Only log errors in development environment
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Error:', error instanceof Error ? error.message : String(error));
+  }
+  return res.status(500).json({ 
+    error: error instanceof Error ? error.message : 'Unknown error',
+    status: 'error'
+  });
+};
+
 // Middleware
-app.use(cors());
+// Apply CORS middleware - uncomment if needed for browser clients
+// app.use(cors()); 
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', (req: Request, res: Response) => { 
+  return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // MCP endpoint for property sales history
-app.post('/mcp/get_property_sales_history', async (req, res) => {
+router.post('/get_property_sales_history', async (req: Request, res: Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -48,16 +61,12 @@ app.post('/mcp/get_property_sales_history', async (req, res) => {
     const data = await attomService.getPropertySalesHistory({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_sales_history:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sale detail
-app.post('/mcp/get_sale_detail', async (req, res) => {
+router.post('/get_sale_detail', async (req: express.Request, res: express.Response) => { 
   try {
     const { address1, address2 } = req.body;
     
@@ -72,16 +81,12 @@ app.post('/mcp/get_sale_detail', async (req, res) => {
     const data = await attomService.getSaleDetail({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sale_detail:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sale snapshot
-app.post('/mcp/get_sale_snapshot', async (req, res) => {
+router.post('/get_sale_snapshot', async (req: express.Request, res: express.Response) => {
   try {
     const { geoIdV4, startsalesearchdate, endsalesearchdate } = req.body;
     
@@ -100,16 +105,12 @@ app.post('/mcp/get_sale_snapshot', async (req, res) => {
     });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sale_snapshot:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for all events snapshot
-app.post('/mcp/get_all_events_snapshot', async (req, res) => {
+router.post('/get_all_events_snapshot', async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.body;
     
@@ -124,65 +125,49 @@ app.post('/mcp/get_all_events_snapshot', async (req, res) => {
     const data = await attomService.getAllEventsSnapshot({ id });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_all_events_snapshot:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales comparables by address
-app.post('/mcp/get_sales_comparables_address', async (req, res) => {
+router.post('/get_sales_comparables_address', async (req: express.Request, res: express.Response) => {
   try {
     const { street, city, county, state, zip, searchType, minComps, maxComps, miles } = req.body;
     const data = await attomService.getSalesComparablesAddress({ 
       street, city, county, state, zip, searchType, minComps, maxComps, miles 
     });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_comparables_address:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales comparables by property ID
-app.post('/mcp/get_sales_comparables_propid', async (req, res) => {
+router.post('/get_sales_comparables_propid', async (req: express.Request, res: express.Response) => {
   try {
     const { propId, searchType, minComps, maxComps, miles } = req.body;
     const data = await attomService.getSalesComparablesPropId({ 
       propId, searchType, minComps, maxComps, miles 
     });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_comparables_propid:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for geographic boundary
-app.post('/mcp/get_geographic_boundary', async (req, res) => {
+router.post('/get_geographic_boundary', async (req: express.Request, res: express.Response) => {
   try {
     const { format, geoIdV4 } = req.body;
     const data = await attomService.getGeographicBoundary({ format, geoIdV4 });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_geographic_boundary:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for school profile
-app.post('/mcp/get_school_profile', async (req, res) => {
+router.post('/get_school_profile', async (req: express.Request, res: express.Response) => {
   try {
     let { geoIdV4, address, address1, address2 } = req.body;
     
@@ -210,16 +195,12 @@ app.post('/mcp/get_school_profile', async (req, res) => {
     const data = await attomService.getSchoolProfile({ geoIdV4 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_school_profile:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for school district
-app.post('/mcp/get_school_district', async (req, res) => {
+router.post('/get_school_district', async (req: express.Request, res: express.Response) => {
   try {
     let { geoIdV4, address, address1, address2 } = req.body;
     
@@ -247,31 +228,23 @@ app.post('/mcp/get_school_district', async (req, res) => {
     const data = await attomService.getSchoolDistrict({ geoIdV4 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_school_district:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for transportation noise
-app.post('/mcp/get_transportation_noise', async (req, res) => {
+router.post('/get_transportation_noise', async (req: express.Request, res: express.Response) => {
   try {
     const { address } = req.body;
     const data = await attomService.getTransportationNoise({ address });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_transportation_noise:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property basic profile
-app.post('/mcp/get_property_basic_profile', async (req, res) => {
+router.post('/get_property_basic_profile', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -286,16 +259,12 @@ app.post('/mcp/get_property_basic_profile', async (req, res) => {
     const data = await attomService.getPropertyBasicProfile({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_basic_profile:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property building permits
-app.post('/mcp/get_building_permits', async (req, res) => {
+router.post('/get_building_permits', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -310,16 +279,12 @@ app.post('/mcp/get_building_permits', async (req, res) => {
     const data = await attomService.getPropertyBuildingPermits({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_building_permits:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property detail with owner
-app.post('/mcp/get_property_detail_owner', async (req, res) => {
+router.post('/get_property_detail_owner', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -334,16 +299,12 @@ app.post('/mcp/get_property_detail_owner', async (req, res) => {
     const data = await attomService.getPropertyDetailOwner({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_detail_owner:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for community profile
-app.post('/mcp/get_community_profile', async (req, res) => {
+router.post('/get_community_profile', async (req: express.Request, res: express.Response) => {
   try {
     const { geoIdV4 } = req.body;
     
@@ -358,16 +319,12 @@ app.post('/mcp/get_community_profile', async (req, res) => {
     const data = await attomService.getCommunityProfile({ geoIdV4 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_community_profile:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for school search
-app.post('/mcp/search_schools', async (req, res) => {
+router.post('/search_schools', async (req: express.Request, res: express.Response) => {
   try {
     const { geoIdV4, radius, page, pageSize } = req.body;
     
@@ -382,16 +339,12 @@ app.post('/mcp/search_schools', async (req, res) => {
     const data = await attomService.searchSchools({ geoIdV4, radius, page, pageSize });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in search_schools:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for points of interest search
-app.post('/mcp/search_poi', async (req, res) => {
+router.post('/search_poi', async (req: express.Request, res: express.Response) => {
   try {
     const { address, radius, categoryName, recordLimit } = req.body;
     
@@ -407,31 +360,23 @@ app.post('/mcp/search_poi', async (req, res) => {
     });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in search_poi:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for all events detail
-app.post('/mcp/get_all_events_detail', async (req, res) => {
+router.post('/get_all_events_detail', async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.body;
     const data = await attomService.getAllEventsDetail({ id });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_all_events_detail:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property mortgage details
-app.post('/mcp/get_property_mortgage_details', async (req, res) => {
+router.post('/get_property_mortgage_details', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -446,16 +391,12 @@ app.post('/mcp/get_property_mortgage_details', async (req, res) => {
     const data = await attomService.getPropertyMortgageDetails({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_mortgage_details:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property detail mortgage owner
-app.post('/mcp/get_property_detail_mortgage_owner', async (req, res) => {
+router.post('/get_property_detail_mortgage_owner', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -470,16 +411,12 @@ app.post('/mcp/get_property_detail_mortgage_owner', async (req, res) => {
     const data = await attomService.getPropertyDetailMortgageOwner({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_detail_mortgage_owner:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property AVM detail
-app.post('/mcp/get_property_avm_detail', async (req, res) => {
+router.post('/get_property_avm_detail', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -493,16 +430,12 @@ app.post('/mcp/get_property_avm_detail', async (req, res) => {
     const data = await attomService.getPropertyAVMDetail({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_avm_detail:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property assessment detail
-app.post('/mcp/get_property_assessment_detail', async (req, res) => {
+router.post('/get_property_assessment_detail', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -517,16 +450,12 @@ app.post('/mcp/get_property_assessment_detail', async (req, res) => {
     const data = await attomService.getPropertyAssessmentDetail({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_assessment_detail:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property home equity
-app.post('/mcp/get_property_home_equity', async (req, res) => {
+router.post('/get_property_home_equity', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -540,16 +469,12 @@ app.post('/mcp/get_property_home_equity', async (req, res) => {
     const data = await attomService.getPropertyHomeEquity({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_home_equity:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property rental AVM
-app.post('/mcp/get_property_rental_avm', async (req, res) => {
+router.post('/get_property_rental_avm', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -563,16 +488,12 @@ app.post('/mcp/get_property_rental_avm', async (req, res) => {
     const data = await attomService.getPropertyRentalAVM({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_rental_avm:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for AVM snapshot
-app.post('/mcp/get_avm_snapshot', async (req, res) => {
+router.post('/get_avm_snapshot', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     
@@ -586,16 +507,12 @@ app.post('/mcp/get_avm_snapshot', async (req, res) => {
     const data = await attomService.getAvmSnapshot({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_avm_snapshot:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for AVM history detail
-app.post('/mcp/get_avm_history_detail', async (req, res) => {
+router.post('/get_avm_history_detail', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -609,31 +526,23 @@ app.post('/mcp/get_avm_history_detail', async (req, res) => {
     const data = await attomService.getAvmHistoryDetail({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_avm_history_detail:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for property details with schools
-app.post('/mcp/get_property_details_with_schools', async (req, res) => {
+router.post('/get_property_details_with_schools', async (req: express.Request, res: express.Response) => {
   try {
     const { attomid } = req.body;
     const data = await attomService.getPropertyDetailsWithSchools({ attomid });
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_property_details_with_schools:', error instanceof Error ? error.message : String(error));
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales history snapshot
-app.post('/mcp/get_sales_history_snapshot', async (req, res) => {
+router.post('/get_sales_history_snapshot', async (req: express.Request, res: express.Response) => {
   try { 
     const { attomid } = req.body;
     
@@ -648,16 +557,12 @@ app.post('/mcp/get_sales_history_snapshot', async (req, res) => {
     const data = await attomService.getSalesHistorySnapshot({ attomid });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_history_snapshot:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales history basic
-app.post('/mcp/get_sales_history_basic', async (req, res) => {
+router.post('/get_sales_history_basic', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -672,16 +577,12 @@ app.post('/mcp/get_sales_history_basic', async (req, res) => {
     const data = await attomService.getSalesHistoryBasic({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_history_basic:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales history expanded
-app.post('/mcp/get_sales_history_expanded', async (req, res) => {
+router.post('/get_sales_history_expanded', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -696,16 +597,12 @@ app.post('/mcp/get_sales_history_expanded', async (req, res) => {
     const data = await attomService.getSalesHistoryExpanded({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_history_expanded:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
 // MCP endpoint for sales history detail
-app.post('/mcp/get_sales_history_detail', async (req, res) => {
+router.post('/get_sales_history_detail', async (req: express.Request, res: express.Response) => {
   try {
     const { address1, address2 } = req.body;
     
@@ -720,46 +617,12 @@ app.post('/mcp/get_sales_history_detail', async (req, res) => {
     const data = await attomService.getSalesHistoryDetail({ address1, address2 });
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in get_sales_history_detail:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Generic endpoint for any ATTOM API query
-app.post('/mcp/execute_query', async (req, res) => {
+router.post('/execute_query', async (req: express.Request, res: express.Response) => {
   try {
     const { endpointKey, params } = req.body;
     
@@ -773,48 +636,26 @@ app.post('/mcp/execute_query', async (req, res) => {
     const data = await executeQuery(endpointKey, params ?? {});
     return res.status(200).json(data);
   } catch (error: unknown) {
-    console.error('Error in execute_query:', error instanceof Error ? error.message : String(error));
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 'error'
-    });
+    return handleError(res, error);
   }
 });
 
-// Start server
+// Register routes
+app.use('/mcp', router);
+
+// Global error handler middleware (example, customize as needed)
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => { 
+  console.error(err.stack);
+  // Avoid sending detailed errors in production
+  const statusCode = (err as any).status ?? 500; // Use a custom status if available
+  return res.status(statusCode).json({
+    error: err.message,
+    status: 'error'
+  });
+});
+
+// Start the server
 app.listen(PORT, () => {
   console.log(`ATTOM MCP Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log('Available endpoints:');
-  console.log('- /mcp/get_property_basic_profile');
-  console.log('- /mcp/get_building_permits');
-  console.log('- /mcp/get_property_detail_owner');
-  console.log('- /mcp/get_property_mortgage_details');
-  console.log('- /mcp/get_property_detail_mortgage_owner');
-  console.log('- /mcp/get_property_avm_detail');
-  console.log('- /mcp/get_property_assessment_detail');
-  console.log('- /mcp/get_property_home_equity');
-  console.log('- /mcp/get_property_rental_avm');
-  console.log('- /mcp/get_property_details_with_schools');
-  console.log('- /mcp/get_property_sales_history');
-  console.log('- /mcp/get_sales_history_snapshot');
-  console.log('- /mcp/get_sales_history_basic');
-  console.log('- /mcp/get_sales_history_expanded');
-  console.log('- /mcp/get_sales_history_detail');
-  console.log('- /mcp/get_sale_detail');
-  console.log('- /mcp/get_sale_snapshot');
-  console.log('- /mcp/get_all_events_detail');
-  console.log('- /mcp/get_all_events_snapshot');
-  console.log('- /mcp/get_avm_snapshot');
-  console.log('- /mcp/get_avm_history_detail');
-  console.log('- /mcp/get_sales_comparables_address');
-  console.log('- /mcp/get_sales_comparables_propid');
-  console.log('- /mcp/get_geographic_boundary');
-  console.log('- /mcp/get_community_profile');
-  console.log('- /mcp/get_school_profile');
-  console.log('- /mcp/get_school_district');
-  console.log('- /mcp/search_schools');
-  console.log('- /mcp/search_poi');
-  console.log('- /mcp/get_transportation_noise');
-  console.log('- /mcp/execute_query (generic endpoint)');
 });

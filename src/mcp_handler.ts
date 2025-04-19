@@ -1,5 +1,5 @@
 // src/mcp_handler.ts
-import { normalizeAddress, searchProperty, schemas } from './mcp_tools';
+import { normalizeAddress, searchProperty, schemas } from './mcp_tools.js';
 
 /**
  * MCP Handler for ATTOM API with Google Places integration

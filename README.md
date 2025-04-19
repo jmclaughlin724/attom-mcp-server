@@ -1,26 +1,69 @@
 # ATTOM MCP Server
 
-A comprehensive TypeScript MCP server for ATTOM Data API with complete OpenAPI specification. This MCP server provides access to property details, sales history, assessments, and geographic data with built-in caching and fallback mechanisms, and can be easily integrated with other APIs, databases, and applications.
+A comprehensive TypeScript implementation of the Model Context Protocol (MCP) server for the ATTOM Data API. This server provides AI systems with structured access to property data, sales history, assessments, and geographic information through a standardized interface.
 
 ## Features
 
-- **Intelligent Fallback**: Automatic address-to-ID conversion and other fallback mechanisms
-- **Multi-level Caching**: In-memory and Redis caching with configurable TTL values
-- **Type Safety**: Full TypeScript support with comprehensive type definitions
-- **Detailed Documentation**: Complete OpenAPI specification with examples
-- **Dual Interface**: Both CLI and MCP server interfaces for flexibility
-- **RESTful API**: Exposes ATTOM API functionality through RESTful endpoints
-- **Docker Support**: Easy containerization and deployment
+- **Model Context Protocol Integration**: Full implementation of the MCP specification for AI tool use
+- **Dual Transport Options**: Support for both stdio and HTTP transports
+- **Intelligent Fallback**: Automatic address-to-ID conversion with multiple fallback strategies
+- **Type Safety**: Full TypeScript with ES modules for better code organization
+- **Comprehensive Property Data**: Access to detailed property information, sales history, and market analytics
+- **Address Normalization**: Google Places integration for address standardization
+- **Resource Templates**: URI-based access to property data using the MCP resource protocol
 
 ## Installation
 
+### Prerequisites
+
+- Node.js 18.x or higher (required for ES modules support)
+- ATTOM API key (required for data access)
+- Google Maps API key (optional, for address normalization)
+
+### Installing the Application
+
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/attom-mcp.git
+cd attom-mcp
+
 # Install dependencies
 npm install
 
 # Copy the example environment file and update with your API keys
 cp .env.example .env
 ```
+
+Edit the `.env` file to add your ATTOM API key and other configuration options:
+
+```env
+ATTOM_API_KEY=your_api_key_here
+ATTOM_API_BASE_URL=https://api.gateway.attomdata.com
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+CACHE_TTL_DEFAULT=3600
+MAX_FALLBACK_ATTEMPTS=3
+FALLBACK_DELAY_MS=1000
+```
+
+### TypeScript Configuration
+
+This project uses ES modules with TypeScript. The `tsconfig.json` file is already configured with the following settings for ES modules support:
+
+```json
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // other options...
+  }
+}
+```
+
+Important notes about ES modules:
+
+- All import statements must include the `.js` extension (even for TypeScript files)
+- The `package.json` includes `"type": "module"` to enable ES modules
+- Dynamic imports are used where needed for compatibility
 
 ## GitHub Deployment
 
@@ -59,11 +102,19 @@ To deploy this project to GitHub:
 
 > **Note**: Make sure your `.env` file is in the `.gitignore` to avoid exposing API keys. Use `.env.example` as a template for others to set up their environment.
 
-## Build
+## Building the Project
+
+The project uses TypeScript with ES modules. To build the project:
 
 ```bash
+# Build the entire project
 npm run build
+
+# Build only the MCP server components
+npm run build:mcp
 ```
+
+The build process compiles TypeScript files to JavaScript with proper ES module format, maintaining the `.js` extensions in import statements.
 
 ## Configuration
 
@@ -73,7 +124,6 @@ Create a `.env` file in the root directory with the following variables:
 ATTOM_API_KEY=your_api_key_here
 ATTOM_API_BASE_URL=https://api.gateway.attomdata.com
 CACHE_TTL_DEFAULT=3600
-REDIS_URL=redis://localhost:6379
 ```
 
 ### Environment Variables
@@ -83,21 +133,17 @@ REDIS_URL=redis://localhost:6379
 | `ATTOM_API_KEY` | Your ATTOM API key (required) | - |
 | `ATTOM_API_BASE_URL` | Base URL for ATTOM API | [https://api.gateway.attomdata.com](https://api.gateway.attomdata.com) |
 | `CACHE_TTL_DEFAULT` | Default TTL for cached responses in seconds | 3600 (1 hour) |
-| `REDIS_URL` | Redis connection URL for caching | [redis://localhost:6379](redis://localhost:6379) |
-| `ATTOM_API_RETRIES` | Number of retry attempts for failed API calls | 0 |
+| `MAX_FALLBACK_ATTEMPTS` | Number of retry attempts for failed API calls | 0 |
 
 ## Usage
 
-### Running the MCP Server
+### Running the Express Server
 
 ```bash
-# Start the MCP server in development mode
-npm run server
-
-# Start the MCP server in development mode with auto-reload
+# Start the Express server in development mode
 npm run dev
 
-# Build and start the MCP server in production mode
+# Build and start the Express server in production mode
 npm run build && node dist/server.js
 ```
 
@@ -195,11 +241,9 @@ async function getPropertyDetails() {
 
 ## Caching
 
-This MCP server implements a multi-level caching strategy:
+This MCP server implements an in-memory caching layer to reduce redundant API calls to ATTOM.
 
-- **In-memory cache**: Quick access to frequently requested data
-- **Redis cache**: Distributed caching across multiple instances
-- **Configurable TTL values**: Different TTL values based on data volatility
+- **In-memory cache**: Fast, request-scoped caching for fallbacks.
 
 ### Default TTL Values
 
@@ -441,7 +485,6 @@ const propertyData = await response.json();
 │       ├── queryManager.ts    # Query management
 │       └── cacheManager.ts    # Cache management
 ├── .env                       # Environment variables
-├── Dockerfile                 # Docker configuration
 └── tsconfig.json              # TypeScript configuration
 ```
 
@@ -461,6 +504,40 @@ npm start
 ## License
 
 Proprietary - All rights reserved
+
+## Troubleshooting
+
+### Server Not Initializing
+
+If the server fails to initialize, check the following:
+
+1. **Environment Variables**
+   - Ensure all required environment variables are set in your `.env` file:
+
+     ```env
+     ATTOM_API_KEY=your_api_key_here
+     ATTOM_API_BASE_URL=https://api.gateway.attomdata.com
+     GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+     CACHE_TTL_DEFAULT=3600
+     MAX_FALLBACK_ATTEMPTS=3
+     FALLBACK_DELAY_MS=500
+     PORT=3000
+     NODE_ENV=development
+     ```
+
+2. **API Key Validation**
+   - Verify your ATTOM API key is valid by testing it directly with a simple API request.
+
+3. **Dependency Issues**
+   - If you encounter dependency-related errors, try reinstalling the dependencies:
+
+     ```bash
+     npm ci
+     ```
+
+4. **Node-fetch Compatibility**
+   - This project uses node-fetch v2.x which is compatible with CommonJS modules
+   - If you see errors related to ESM modules, ensure you're using the correct version of node-fetch
 
 ## Support
 
@@ -486,60 +563,82 @@ For support, contact [ATTOM API Support](https://api.gateway.attomdata.com/suppo
 
 All param sets are enumerated in `openapiRegistry.ts` for a complete OpenAPI spec.
 
-## Docker
+## MCP Server Architecture
 
-### Building and Running the Docker Container
+This server implements the Model Context Protocol (MCP), allowing it to be used as a tool provider for AI applications. The MCP integration enables AI models to access property data through a standardized interface.
 
-```bash
-# Build the Docker image
-docker build -t attom-mcp-server -f attom_mcp.dockerfile .
+### Key Components
 
-# Run the Docker container
-docker run -p 3000:3000 \
-  -e ATTOM_API_KEY=your_api_key_here \
-  -e GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here \
-  attom-mcp-server
-```
+- **McpServer**: Core server implementation from the MCP SDK
+- **StreamableHTTPServerTransport**: HTTP transport for web-based access
+- **StdioServerTransport**: Standard I/O transport for direct AI integration
+- **Tool Registration**: Dynamic registration of ATTOM API endpoints as MCP tools
+- **Resource Templates**: URI-based access to property data (e.g., `property://{address}`)
+- **Zod Schema Validation**: Type-safe parameter validation for all tools
 
-### Docker Compose
-
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3'
-
-services:
-  attom-mcp-server:
-    build:
-      context: .
-      dockerfile: attom_mcp.dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - ATTOM_API_KEY=your_api_key_here
-      - GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-
-volumes:
-  redis-data:
-```
-
-Run with Docker Compose:
+### Running the MCP Server
 
 ```bash
-docker-compose up -d
+# Start the MCP server with HTTP transport
+npm run mcp:http
+
+# Start the MCP server with stdio transport (for direct integration with AI systems)
+npm run mcp:stdio
 ```
 
-## Generate OpenAPI
+### Transport Options
+
+- **stdio transport**: Recommended for direct integration with AI systems. The server communicates through standard input/output streams, allowing for seamless integration with AI frameworks that support the MCP protocol.
+
+- **HTTP transport**: Useful for development, testing, and integration with web applications. The server exposes an HTTP endpoint that accepts MCP requests and returns structured responses.
+
+### Available MCP Tools
+
+The following tools are available through the MCP interface:
+
+#### Address and Property Tools
+
+- `normalize_address` - Normalize an address using Google Places API
+- `search_property` - Search for a property by address
+- `get_property_basic_profile` - Get basic property information
+- `get_property_detail_owner` - Get detailed owner information
+- `get_property_mortgage_details` - Get mortgage details
+- `get_property_detail_mortgage_owner` - Get combined mortgage and owner details
+- `get_property_avm_detail` - Get Automated Valuation Model details
+- `get_property_assessment_detail` - Get property assessment details
+- `get_property_home_equity` - Get property home equity information
+- `get_building_permits` - Get building permit history
+
+#### Sales and Market Tools
+
+- `get_property_sales_history` - Get property sales history
+- `get_sales_history_basic` - Get basic sales history
+- `get_sales_history_expanded` - Get expanded sales history
+- `get_sales_history_detail` - Get detailed sales history
+- `get_sales_comparables_address` - Get comparable sales by address
+- `get_sales_comparables_propid` - Get comparable sales by property ID
+
+#### Community and Geographic Tools
+
+- `get_community_profile` - Get community profile information
+- `get_geographic_boundary` - Get geographic boundary information
+- `get_transportation_noise` - Get transportation noise information
+- `search_schools` - Search for schools in an area
+- `get_school_profile` - Get detailed school information
+- `get_school_district` - Get school district information
+- `search_poi` - Search for points of interest
+
+#### Utility Tools
+
+- `execute_query` - Execute a custom ATTOM API query
+
+### MCP Resources
+
+The server also provides the following MCP resources:
+
+- `property://{address}` - Access property data by address
+
+## OpenAPI Schema Generation
 
 npm run gen:openapi
 
@@ -549,8 +648,10 @@ npm run gen:openapi
 - Prefetch caching is in `utils/caching.ts`.
 - Full CLI usage is in `src/index.ts`.
 - Full typed endpoints in `src/attomApiFramework.ts`.
-- MCP server implementation in `src/server.ts`.
+- REST API server implementation in `src/server.ts`.
 - MCP tools registration in `src/mcp/tools.ts`.
+- MCP server implementation in `src/mcp/mcpServer.ts`.
+- MCP server runner in `src/runMcpServer.ts`.
 
 ## Query Workflow
 
@@ -566,3 +667,6 @@ The MCP server implements an intelligent query workflow:
 8. **Caching**: Caches results for improved performance
 
 This workflow ensures that the MCP server can handle a wide variety of queries with minimal input parameters, making it easy to integrate with other systems.
+
+```bash
+8. **Caching**: Caches results for improved performance

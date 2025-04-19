@@ -5,8 +5,8 @@
  * leveraging the endpoint configuration and query manager.
  */
 
-import { executeQuery, isValidQuery } from './queryManager';
-import { EndpointCategory, getEndpointsByCategory, AllEventsDataField, endpoints } from '../config/endpointConfig';
+import { executeQuery, isValidQuery } from './queryManager.js';
+import { EndpointCategory, getEndpointsByCategory, AllEventsDataField, endpoints } from '../config/endpointConfig.js';
 
 /**
  * ATTOM API Service class

@@ -6,16 +6,17 @@
  * and implements rate limiting and caching strategies.
  */
 
-import { fetchAttom } from '../utils/fetcher';
+import { fetchAttom } from '../utils/fetcher.js';
 import { 
   getEndpointConfig, 
   hasRequiredParams,
   getFallbackStrategy,
   FallbackStrategy,
-  AllEventsDataField
-} from '../config/endpointConfig';
-import { fallbackAttomIdFromAddressCached, fallbackGeoIdV4SubtypeCached } from '../utils/fallback';
-import { getSalesDateRange, getSalesTrendYearRange } from '../utils/dateUtils';
+  AllEventsDataField,
+  endpoints
+} from '../config/endpointConfig.js';
+import { fallbackAttomIdFromAddressCached, fallbackGeoIdV4SubtypeCached } from '../utils/fallback.js';
+import { getSalesDateRange, getSalesTrendYearRange } from '../utils/dateUtils.js';
 
 // Queue for tracking in-flight requests
 const requestQueue: Map<string, Promise<any>> = new Map();
@@ -104,13 +105,13 @@ async function tryGetDataFromAllEvents(
     
     // If we couldn't get an attomId, we can't proceed
     if (!attomId) {
-      console.log('[AllEvents Fallback] Could not get attomId from address');
+      // Removed verbose logging
       return null;
     }
     
     // Call the AllEvents endpoint
-    console.log(`[AllEvents Fallback] Fetching data from /allevents/detail with id=${attomId}`);
-    const allEventsData = await fetchAttom('/propertyapi/v1.0.0/allevents/detail', { id: attomId });
+    // Removed verbose logging
+    const allEventsData = await fetchAttom('/propertyapi/v1.0.0/allevents/detail', { id: attomId }) as Record<string, unknown>;
     
     // Extract the required fields
     return extractDataFromAllEvents(allEventsData, fields);
@@ -135,11 +136,11 @@ async function tryAllEventsForEndpoint(
   const data = await tryGetDataFromAllEvents(params, allEventsFields);
   
   if (data) {
-    console.log(`[Fallback] Successfully retrieved data from /allevents/detail for ${endpointKey}`);
+    // Removed verbose logging
     return data;
   }
   
-  console.log(`[Fallback] Could not get data from /allevents/detail, falling back to direct endpoint call`);
+  // Removed verbose logging
   return null;
 }
 
@@ -190,7 +191,7 @@ export async function applyAddressToGeoIdFallback(
   const address2 = updatedParams.address2 ?? '';
   const cacheKey = `${address1}|${address2}`;
   
-  console.log(`[GeoIdFallback] Using ${preferredSubtype} subtype for ${endpointKey}`);
+  // Removed verbose logging
   
   let geoIdV4 = await fallbackGeoIdV4SubtypeCached(
     address1,
@@ -232,7 +233,7 @@ function processGeoIdV4(geoIdV4: string, preferredSubtype: string): string {
     
     if (matchingGeoId) {
       selectedGeoId = matchingGeoId;
-      console.log(`[GeoIdFallback] Selected ${preferredSubtype} geoIdV4: ${selectedGeoId}`);
+      // Removed verbose logging
     }
   }
   
@@ -342,7 +343,7 @@ function applyDateParameters(
         const { startDate, endDate } = getSalesDateRange();
         updatedParams.startsalesearchdate = startDate;
         updatedParams.endsalesearchdate = endDate;
-        console.log(`[DateCalc] Using calculated date range for saleSnapshot: ${startDate} to ${endDate}`);
+        // Removed verbose logging
       }
       break;
       
@@ -355,7 +356,7 @@ function applyDateParameters(
         const { startYear, endYear } = getSalesTrendYearRange();
         updatedParams.startyear = startYear;
         updatedParams.endyear = endYear;
-        console.log(`[DateCalc] Using calculated year range for transactionSalesTrend: ${startYear} to ${endYear}`);
+        // Removed verbose logging
       }
       break;
   }
@@ -366,8 +367,8 @@ function applyDateParameters(
 /**
  * Execute a query to the ATTOM API
  * @param endpointKey Endpoint key from configuration
- * @param params Query parameters
- * @returns API response
+ * @param params Query parameters (can include address, geoIdV4, attomId, etc.)
+ * @returns API response with status and data specific to the endpoint
  */
 export async function executeQuery(
   endpointKey: string, 
@@ -387,7 +388,7 @@ export async function executeQuery(
     // Try to apply address-to-geoIdV4 conversion regardless of fallback strategy
     try {
       enhancedParams = await applyAddressToGeoIdFallback(endpointKey, enhancedParams);
-      console.log(`[AddressFallback] Applied address-to-geoIdV4 conversion for ${endpointKey}`);
+      // Removed verbose logging
     } catch (error) {
       console.warn(`[AddressFallback] Failed to convert address to geoIdV4: ${error}`);
     }
@@ -399,7 +400,7 @@ export async function executeQuery(
   // Check if request is already in flight
   const existingRequest = requestQueue.get(cacheKey);
   if (existingRequest) {
-    console.log(`[Cache] Request already in flight for ${endpointKey}`);
+    // Removed verbose logging
     return existingRequest;
   }
   
@@ -415,8 +416,8 @@ export async function executeQuery(
       }
       
       // Execute the API request
-      console.log(`Executing query to ${config.path} with params:`, updatedParams);
-      const response = await fetchAttom(config.path, updatedParams);
+      // Removed verbose logging
+      const response = await fetchAttom(config.path, updatedParams) as Record<string, unknown>;
       
       return response;
     } finally {
@@ -481,5 +482,5 @@ export function isValidQuery(endpointKey: string, params: Record<string, any>): 
  * @returns Array of endpoint keys
  */
 export function getAvailableQueryTypes(): string[] {
-  return Object.keys(require('../config/endpointConfig').endpoints);
+  return Object.keys(endpoints);
 }

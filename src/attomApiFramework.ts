@@ -1,8 +1,8 @@
 // src/attomApiFramework.ts
 
-import { fetchAttom } from './utils/fetcher';
-import { fallbackAttomIdFromAddressCached, fallbackGeoIdV4SubtypeCached } from './utils/fallback';
-import { preloadAddressMetadata } from './utils/caching';
+import { fetchAttom } from './utils/fetcher.js';
+import { fallbackAttomIdFromAddressCached, fallbackGeoIdV4SubtypeCached } from './utils/fallback.js';
+import { preloadAddressMetadata } from './utils/caching.js';
 
 export class AttomApiFramework {
   constructor(private readonly apiKey: string) {

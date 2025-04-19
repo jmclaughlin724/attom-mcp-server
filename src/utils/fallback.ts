@@ -1,7 +1,7 @@
 // src/utils/fallback.ts
-import { fetchAttom } from './fetcher';
-import { getRequestCache, cacheData, getCachedData } from './caching';
-import { normalizeAddressStringForAttom, NormalizedAddress } from './googlePlaces';
+import { fetchAttom } from './fetcher.js';
+import { getRequestCache, cacheData, getCachedData } from './caching.js';
+import { normalizeAddressStringForAttom, NormalizedAddress } from './googlePlaces.js';
 import dotenv from 'dotenv';
 
 // Load environment variables

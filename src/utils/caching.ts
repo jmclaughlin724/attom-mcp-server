@@ -1,5 +1,5 @@
 // src/utils/caching.ts
-import { fetchAttom } from './fetcher';
+import { fetchAttom } from './fetcher.js';
 import dotenv from 'dotenv';
 
 // Load environment variables

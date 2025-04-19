@@ -2,12 +2,14 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { AttomApiFramework } from './attomApiFramework';
-import mcpHandler from './mcp_handler';
+
+// Define yargs types for ES modules
+import { AttomApiFramework } from './attomApiFramework.js';
+import mcpHandler from './mcp_handler.js';
 
 // Type definitions for yargs
-type YargsArgv = yargs.Argv;
-interface CommandArgs extends yargs.Arguments {
+type YargsArgv = typeof yargs;
+interface CommandArgs extends Record<string, unknown> {
   [key: string]: unknown;
   attomid?: string;
   address1?: string;
