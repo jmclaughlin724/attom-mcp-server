@@ -27,14 +27,14 @@ const endpointTTL: Record<string, number> = {
   '/propertyapi/v1.0.0/property/expandedprofile': 86400, // 24 hours
   '/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}': 86400, // 24 hours
   '/property/v2/salescomparables/propid/{propId}': 86400, // 24 hours
-  '/propertyapi/v1.0.0/assessment/detail': 604800, // 1 week
-  '/propertyapi/v1.0.0/assessmenthistory/detail': 604800, // 1 week
-  '/v4/neighborhood/community': 604800, // 1 week
-  '/v4/school/profile': 259200, // 3 days
-  '/v4/school/district': 604800, // 1 week
-  '/v4/school/search': 259200, // 3 days
-  '/v4/poi/search': 259200, // 3 days
-  '/transportationnoise': 604800, // 1 week
+  '/propertyapi/v1.0.0/assessment/detail': 86400, // 24 hours
+  '/propertyapi/v1.0.0/assessmenthistory/detail': 86400, // 24 hours
+  '/v4/neighborhood/community': 86400, // 24 hours
+  '/v4/school/profile': 86400, // 24 hours
+  '/v4/school/district': 86400, // 24 hours
+  '/v4/school/search': 86400, // 24 hours
+  '/v4/poi/search': 86400, // 24 hours
+  '/transportationnoise': 86400, // 24 hours
 };
 
 export function getRequestCache(cacheKey: string): RequestCache {

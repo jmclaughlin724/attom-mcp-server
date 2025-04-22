@@ -11,6 +11,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { mcpTools } from './tools.js'; 
+import { groupedTools } from './groupedTools.js'; // Import new groupedTools
 import { AttomService } from "../services/attomService.js";
 import { normalizeAddressStringForAttom } from "../utils/googlePlaces.js";
 import { writeLog } from "../utils/logger.js";
@@ -143,7 +144,7 @@ export function createMcpServer() {
   );
 
   // Helper function to create a Zod schema from JSON schema properties
-  function createZodSchemaFromProperties(properties: any, required: string[] = []): z.ZodRawShape {
+  function createZodSchemaFromProperties(properties: any, required: readonly string[] = []): z.ZodRawShape {
     const shape: z.ZodRawShape = {};
     for (const [key, prop] of Object.entries(properties)) {
       const propValue = prop as { type: string; description?: string };
@@ -177,8 +178,8 @@ export function createMcpServer() {
     return shape;
   }
 
-  // Register all ATTOM API tools from the mcpTools array
-  for (const tool of mcpTools) {
+  // Register all ATTOM API tools from the groupedTools and mcpTools arrays
+  for (const tool of [...groupedTools, ...mcpTools]) {
     let zodShape: z.ZodRawShape = {};
 
     if (tool.parameters.type === 'object' && tool.parameters.properties) {
