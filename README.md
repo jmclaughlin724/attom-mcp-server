@@ -132,15 +132,15 @@ npm run mcp:stdio     # STDIO (ideal for AI tool runners)
 
 ## MCP Tools and Endpoints
 
-Each ATTOM endpoint is wrapped as an MCP **tool** with strict Zod schemas.  Tools live in `src/mcp/tools.ts` and are auto-registered at start-up.
+Each ATTOM endpoint is wrapped as an MCP **tool** with strict Zod schemas. Tools now live primarily in `src/mcp/groupedTools.ts` (consolidated interface) while legacy per‑endpoint tools remain in `src/mcp/tools.ts` for backward compatibility.
 
 | Tool | Description | Key Params |
 |------|-------------|-----------|
-| `normalize_address` | Google Places → ATTOM address parts | `address` |
-| `search_property` | Text search → property list | `address1`, `address2` |
-| `get_property_basic_profile` | Basic property details | `address1`, `address2` |
-| `get_building_permits` | Historical permits & `livingSize` | `address1`, `address2` **or** `attomid` |
-| ... | *(30+ additional tools – see code)* | – |
+| `property_query` | Consolidated property‑related endpoints | `kind`, `params` |
+| `sales_query` | Sales comparables & history endpoints | `kind`, `params` |
+| `community_query` | Area insights (schools, community, noise) | `kind`, `params` |
+| `misc_query` | Utility & miscellaneous endpoints | `kind`, `params` |
+| ... | *(legacy granular tools – see code)* | – |
 | `get_sales_comparables_address` | Comparable sales by address | See [Sales Comparables Deep-Dive](#sales-comparables-deep-dive) |
 | `get_sales_comparables_propid` | Comparable sales by ATTOM ID | " |
 
@@ -210,11 +210,12 @@ expect(fetchMock).toHaveBeenCalledTimes(2)
 ```text
 attom-mcp/
 ├─ src/
-│  ├─ server.ts               # Express HTTP wrapper
-│  ├─ runMcpServer.ts         # Transport bootstrap
+│  ├─ server.ts               # Express HTTP wrapper (legacy)
+│  ├─ runMcpServer.ts         # Transport bootstrap (CLI entry)
 │  ├─ mcp/
-│  │   ├─ tools.ts            # Tool registry & Zod schemas
-│  │   └─ mcpServer.ts        # MCP core bridge
+│  │   ├─ groupedTools.ts      # Grouped MCP tools (recommended)
+│  │   ├─ mcpServer.ts        # MCP core bridge & registration
+│  │   └─ tools.ts            # Legacy per‑endpoint tools
 │  ├─ services/
 │  │   └─ attomService.ts     # High-level ATTOM orchestrator
 │  ├─ utils/

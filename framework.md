@@ -3,14 +3,15 @@
 ```plaintext
 attom_mcp/
 ├── src/
-│   ├── index.ts                  # CLI entry point
-│   ├── server.ts                 # MCP server implementation
+│   ├── index.ts                  # (legacy) CLI entry point
+│   ├── runMcpServer.ts           # Starts the MCP server (CLI entry)
+│   ├── server.ts                 # Express HTTP wrapper (legacy)
 │   ├── attomApiFramework.ts      # Core API framework
 │   ├── openapiRegistry.ts        # OpenAPI schema registry
-│   ├── mcp_handler.ts            # MCP protocol handler
-│   ├── mcp_tools.ts              # Legacy MCP tools
 │   ├── mcp/
-│   │   └── tools.ts              # MCP tool registrations
+│   │   ├── mcpServer.ts          # MCP server configuration and registration
+│   │   ├── groupedTools.ts       # Consolidated grouped MCP tools
+│   │   └── tools.ts              # Legacy granular tools
 │   ├── config/
 │   │   └── endpointConfig.ts     # API endpoint configuration
 │   ├── services/
@@ -41,8 +42,11 @@ attom_mcp/
 
 ### Server Implementation
 
-- `server.ts`: Express.js server that implements the MCP protocol
-- `mcp/tools.ts`: Registers all ATTOM API endpoints as MCP tools
+- `runMcpServer.ts`: Starts the MCP server (HTTP or stdio)
+- `mcp/mcpServer.ts`: Core MCP server configuration
+- `mcp/groupedTools.ts`: Consolidated grouped MCP tools
+- `mcp/tools.ts`: Legacy per‑endpoint tools (deprecated)
+- `server.ts`: Express HTTP wrapper (legacy)
 
 ### API Framework
 
