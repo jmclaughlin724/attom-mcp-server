@@ -130,7 +130,7 @@ export const endpoints: Record<string, EndpointConfig> = {
     description: 'Comprehensive property information including assessment, AVM, and sales data',
     requiredParams: ['id'],
     optionalParams: [],
-    fallbackStrategy: FallbackStrategy.ATTOMID_TO_ID,
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
     rateLimit: DEFAULT_RATE_LIMIT,
     cache: PROPERTY_CACHE,
   },
@@ -315,7 +315,7 @@ export const endpoints: Record<string, EndpointConfig> = {
   },
 
   transactionSalesTrend: {
-    path: '/propertyapi/v1.0.0/transaction/salestrend',
+    path: '/v4/transaction/salestrend',
     category: EndpointCategory.SALE,
     description: 'Sales trend data for a location over time',
     requiredParams: ['geoIdV4', 'interval', 'startyear', 'endyear'],
@@ -428,6 +428,43 @@ export const endpoints: Record<string, EndpointConfig> = {
     fallbackStrategy: FallbackStrategy.NONE,
     rateLimit: DEFAULT_RATE_LIMIT,
     cache: PROPERTY_CACHE,
+  },
+  
+  // Sales comparables endpoints
+  salesComparablesAddress: {
+    path: '/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}',
+    category: EndpointCategory.SALE,
+    description: 'Get sales comparables for a property by address',
+    requiredParams: ['street', 'city', 'state', 'zip'],
+    optionalParams: [
+      'county', 'searchType', 'minComps', 'maxComps', 'miles', 
+      'sameCity', 'useSameTargetCode', 'useCode', 'bedroomsRange', 
+      'bathroomRange', 'sqFeetRange', 'lotSizeRange', 'onlyPropertiesWithPool',
+      'saleDateRange', 'saleAmountRangeFrom', 'saleAmountRangeTo', 'unitNumberRange',
+      'yearBuiltRange', 'storiesRange', 'include0SalesAmounts', 'includeFullSalesOnly',
+      'ownerOccupied', 'distressed'
+    ],
+    fallbackStrategy: FallbackStrategy.NONE,
+    rateLimit: DEFAULT_RATE_LIMIT,
+    cache: VOLATILE_CACHE // Use volatile cache since comparables change more frequently
+  },
+
+  salesComparablesPropId: {
+    path: '/property/v2/salescomparables/propid/{propId}',
+    category: EndpointCategory.SALE,
+    description: 'Get sales comparables for a property by property ID',
+    requiredParams: ['propId'],
+    optionalParams: [
+      'searchType', 'minComps', 'maxComps', 'miles',
+      'sameCity', 'useSameTargetCode', 'useCode', 'bedroomsRange',
+      'bathroomRange', 'sqFeetRange', 'lotSizeRange', 'onlyPropertiesWithPool',
+      'saleDateRange', 'saleAmountRangeFrom', 'saleAmountRangeTo', 'unitNumberRange',
+      'yearBuiltRange', 'storiesRange', 'include0SalesAmounts', 'includeFullSalesOnly',
+      'ownerOccupied', 'distressed'
+    ],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
+    rateLimit: DEFAULT_RATE_LIMIT,
+    cache: VOLATILE_CACHE
   },
 };
 

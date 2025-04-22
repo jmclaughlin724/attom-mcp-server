@@ -12,6 +12,9 @@ import { AttomService } from './services/attomService.js';
 import { executeQuery, applyAddressToGeoIdFallback } from './services/queryManager.js';
 import dotenv from 'dotenv';
 
+// Test log message
+console.log('--- ATTOM MCP Server Starting ---');
+
 // Load environment variables
 dotenv.config();
 
@@ -346,7 +349,7 @@ router.post('/search_schools', async (req: express.Request, res: express.Respons
 // MCP endpoint for points of interest search
 router.post('/search_poi', async (req: express.Request, res: express.Response) => {
   try {
-    const { address, radius, categoryName, recordLimit } = req.body;
+    const { address, radius, categoryName } = req.body;
     
     if (!address) {
       return res.status(400).json({ error: 'Missing required parameter: address' });
@@ -355,8 +358,7 @@ router.post('/search_poi', async (req: express.Request, res: express.Response) =
     const data = await attomService.searchPOI({ 
       address, 
       radius, 
-      categoryName, 
-      recordLimit 
+      categoryName
     });
     return res.status(200).json(data);
   } catch (error: unknown) {

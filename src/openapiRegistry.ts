@@ -429,7 +429,7 @@ openApiRegistry.registerPath({
 // POI API paths
 openApiRegistry.registerPath({
   method: 'get',
-  path: '/v4/poi/search',
+  path: '/v4/neighborhood/poi',
   summary: 'Search for points of interest near a location',
   description: 'Returns a list of points of interest within a specified radius of a location.',
   request: {

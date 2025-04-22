@@ -414,7 +414,7 @@ export class AttomApiFramework {
     address: async (params: {
       street: string;
       city: string;
-      county: string;
+      county?: string;
       state: string;
       zip: string;
       [key: string]: any;
@@ -422,7 +422,9 @@ export class AttomApiFramework {
       const { street, city, county, state, zip, ...rest } = params;
       const encStreet = encodeURIComponent(street);
       const encCity = encodeURIComponent(city);
-      const encCounty = encodeURIComponent(county);
+      // Use a literal dash '-' if county is not provided or equals '-', as required by the API
+      // Do NOT encode the dash itself as that would make it %2D which isn't what the API expects
+      const encCounty = (county && county !== '-') ? encodeURIComponent(county) : '-';
       const encState = encodeURIComponent(state);
       const encZip = encodeURIComponent(zip);
       const path = `/property/v2/salescomparables/address/${encStreet}/${encCity}/${encCounty}/${encState}/${encZip}`;

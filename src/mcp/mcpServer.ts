@@ -10,9 +10,10 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { mcpTools } from "./tools.js";
+import { mcpTools } from './tools.js'; 
 import { AttomService } from "../services/attomService.js";
 import { normalizeAddressStringForAttom } from "../utils/googlePlaces.js";
+import { writeLog } from "../utils/logger.js";
 
 // Create ATTOM service instance
 const attomService = new AttomService();
@@ -108,7 +109,7 @@ export function createMcpServer() {
         }
         
         // Fetch property data from ATTOM API
-        const propertyData = await attomService.executeQuery("propertyDetail", {
+        const propertyData = await attomService.executeQuery("propertyBasicProfile", {
           address1: finalAddress1,
           address2: finalAddress2
         });
@@ -141,44 +142,81 @@ export function createMcpServer() {
     }
   );
 
+  // Helper function to create a Zod schema from JSON schema properties
+  function createZodSchemaFromProperties(properties: any, required: string[] = []): z.ZodRawShape {
+    const shape: z.ZodRawShape = {};
+    for (const [key, prop] of Object.entries(properties)) {
+      const propValue = prop as { type: string; description?: string };
+      let fieldSchema: z.ZodTypeAny;
+
+      switch (propValue.type) {
+        case 'string':
+          fieldSchema = z.string();
+          break;
+        case 'number':
+          fieldSchema = z.number();
+          break;
+        case 'boolean':
+          fieldSchema = z.boolean();
+          break;
+        default:
+          fieldSchema = z.any();
+      }
+
+      if (propValue.description) {
+        fieldSchema = fieldSchema.describe(propValue.description);
+      }
+
+      // Make field optional if not in the required list
+      if (! (required ?? []).includes(key)) {
+        fieldSchema = fieldSchema.optional();
+      }
+
+      shape[key] = fieldSchema;
+    }
+    return shape;
+  }
+
   // Register all ATTOM API tools from the mcpTools array
   for (const tool of mcpTools) {
-    // Convert JSON Schema properties to Zod schema
-    const zodSchema: Record<string, z.ZodType<any>> = {};
-    
-    for (const [key, prop] of Object.entries(tool.parameters.properties)) {
-      // Use type assertion to access properties safely
-      const propValue = prop as { type: string; description?: string };
-      if (propValue.type === 'string') {
-        zodSchema[key] = z.string().describe(propValue.description ?? '');
-      } else if (propValue.type === 'number') {
-        zodSchema[key] = z.number().describe(propValue.description ?? '');
-      } else if (propValue.type === 'boolean') {
-        zodSchema[key] = z.boolean().describe(propValue.description ?? '');
-      } else {
-        zodSchema[key] = z.any().describe(propValue.description ?? '');
-      }
+    let zodShape: z.ZodRawShape = {};
+
+    if (tool.parameters.type === 'object' && tool.parameters.properties) {
+      // Generate the shape directly from properties
+      zodShape = createZodSchemaFromProperties(tool.parameters.properties, tool.parameters.required ?? []);
+    } else {
+       // Handle cases without properties (e.g., no params needed)
+       console.warn(`[MCP Server] Tool ${tool.name} has no properties defined in parameters.`);
+       zodShape = {}; // Empty shape for tools with no parameters
     }
-    
+
     server.tool(
       tool.name,
-      zodSchema,
+      zodShape, // Pass the generated ZodRawShape
       async (params: Record<string, any>) => {
         try {
+          writeLog(`[McpServer:Handler] Invoking tool: ${tool.name}, Params: ${JSON.stringify(params)}`);
           // Convert params to the expected format for the handler
           const result = await tool.handler(params as any);
+          writeLog(`[McpServer:Handler] Tool ${tool.name} executed successfully.`);
           return {
             content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
           };
         } catch (error: any) {
+          writeLog(`[McpServer:Handler] Error in tool ${tool.name}: ${error instanceof Error ? error.message : String(error)}`); // Log message first
+          // Log the full error server-side for better debugging
+          console.error("[MCP Error Handler] Caught error:", error);
+          // Construct detailed error response
+          const errorResponse = {
+            success: false,
+            error: error.message ?? error.stack ?? "Unknown error", 
+            details: error.details, // Include details if they exist
+            params // Include original params for context
+          };
           return {
             content: [{ 
               type: "text", 
-              text: JSON.stringify({
-                success: false,
-                error: error.message ?? "Unknown error",
-                params
-              }, null, 2)
+              text: JSON.stringify(errorResponse, null, 2)
             }]
           };
         }

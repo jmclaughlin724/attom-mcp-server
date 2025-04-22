@@ -1,8 +1,12 @@
 // src/utils/fallback.ts
 import { fetchAttom } from './fetcher.js';
 import { getRequestCache, cacheData, getCachedData } from './caching.js';
+import { writeLog } from './logger.js';
 import { normalizeAddressStringForAttom, NormalizedAddress } from './googlePlaces.js';
 import dotenv from 'dotenv';
+
+// Import type only to avoid runtime dependency
+type AttomApiError = { statusCode: number };
 
 // Load environment variables
 dotenv.config();
@@ -15,7 +19,9 @@ const FALLBACK_DELAY_MS = parseInt(process.env.FALLBACK_DELAY_MS ?? '500');
  * Sleep utility for fallback delay
  * @param ms Milliseconds to sleep
  */
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Normalize address using Google Places API
@@ -37,7 +43,7 @@ export async function normalizeAddress(
  * Extracted to reduce cognitive complexity
  * @param address1 Street address
  * @param address2 City, state, ZIP
- * @param useGoogleNormalization Whether to use Google Places for normalization
+ * @param useGoogleNormalization Whether to use Google Places for address normalization
  * @returns Object with normalized addresses
  */
 async function normalizeAddressIfEnabled(
@@ -54,12 +60,10 @@ async function normalizeAddressIfEnabled(
       if (normalized) {
         normalizedAddress1 = normalized.address1;
         normalizedAddress2 = normalized.address2;
-        console.log(`[Google Places] Normalized address: ${normalized.formattedAddress}`);
-        console.log(`[Google Places] address1: ${normalizedAddress1}, address2: ${normalizedAddress2}`);
+        writeLog(`[Google Places] Normalized address: ${normalized.formattedAddress}, address1: ${normalizedAddress1}, address2: ${normalizedAddress2}`);
       }
     } catch (error: unknown) {
-      console.error('[Google Places] Address normalization failed, using original address', 
-        error instanceof Error ? error.message : String(error));
+      writeLog(`[Google Places] Address normalization failed, using original address. Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   
@@ -67,80 +71,103 @@ async function normalizeAddressIfEnabled(
 }
 
 /**
- * Fallback to get ATTOM ID from address with caching
- * @param address1 Street address
- * @param address2 City, state, ZIP
- * @param cacheKey Cache key for request cache
- * @param useGoogleNormalization Whether to use Google Places for address normalization
- * @returns ATTOM ID or empty string if not found
+ * Extract ATTOM ID from various response structures
+ * @param response API response object
+ * @returns ATTOM ID if found, null otherwise
  */
-export async function fallbackAttomIdFromAddressCached(
-  address1: string,
-  address2: string,
-  cacheKey: string,
-  useGoogleNormalization: boolean = true
-): Promise<string> {
-  // Type assertion to help TypeScript understand our cache structure
-  const cache = getRequestCache(cacheKey) as GeoIdCache;
-  
-  // If we already have the attomId in cache, use it
-  if (cache.attomid) {
-    return cache.attomid;
+/**
+ * Check for ATTOM ID in the status object
+ */
+function checkStatusAttomId(response: any): string | null {
+  if (response?.status?.attomId) {
+    writeLog(`[Fallback] Found attomId in status: ${response.status.attomId}`);
+    return response.status.attomId.toString();
+  }
+  return null;
+}
+
+/**
+ * Check for ATTOM ID in the primary property identifier
+ */
+function checkPropertyIdentifierAttomId(response: any): string | null {
+  if (response?.property?.[0]?.identifier?.attomId) {
+    writeLog(`[Fallback] Found attomId in property identifier: ${response.property[0].identifier.attomId}`);
+    return response.property[0].identifier.attomId.toString();
   }
   
-  // Check data cache first
-  const cacheDataKey = `attomId:${address1}:${address2}`;
-  const cachedAttomId = getCachedData(cacheDataKey);
-  if (cachedAttomId) {
-    cache.attomid = cachedAttomId;
-    return cachedAttomId;
+  // Check alternate location (Id field as a known alias) - just log, don't return
+  if (response?.property?.[0]?.identifier?.Id) {
+    writeLog(`[Fallback] Found Id in property identifier: ${response.property[0].identifier.Id} (Using as fallback)`);
   }
   
-  console.warn(`[Fallback] calling /property/detail => attomId for: ${address1}, ${address2}`);
+  return null;
+}
+
+/**
+ * Check for ATTOM ID directly in the property object
+ */
+function checkDirectPropertyAttomId(response: any): string | null {
+  if (response?.property?.[0]?.attomId) {
+    writeLog(`[Fallback] Found attomId in property object: ${response.property[0].attomId}`);
+    return response.property[0].attomId.toString();
+  }
+  return null;
+}
+
+/**
+ * Check for ATTOM ID in property array elements
+ */
+function checkPropertyArrayAttomIds(response: any): string | null {
+  if (!Array.isArray(response?.property)) {
+    return null;
+  }
   
-  // Try to normalize the address using Google Places if enabled
-  const { normalizedAddress1, normalizedAddress2 } = await normalizeAddressIfEnabled(
-    address1, 
-    address2, 
-    useGoogleNormalization
-  );
-  
-  // Attempt to fetch property details with retry logic
-  for (let attempts = 0; attempts < MAX_FALLBACK_ATTEMPTS; attempts++) {
-    try {
-      const result = await fetchAttom('/propertyapi/v1.0.0/property/detail', { 
-        address1: normalizedAddress1, 
-        address2: normalizedAddress2 
-      });
-      
-      if (result?.status === 'ok' && result?.property?.[0]?.identifier?.attomId) {
-        const attomId = result.property[0].identifier.attomId;
-        
-        // Cache the result
-        cache.attomid = attomId;
-        cacheData(cacheDataKey, attomId, '/propertyapi/v1.0.0/property/detail');
-        
-        return attomId;
-      }
-      
-      // Log appropriate warning based on response
-      const warningMessage = result?.status === 'ok' 
-        ? '[Fallback] Got successful response but no attomId found'
-        : `[Fallback] Attempt ${attempts + 1} failed: Invalid response`;
-      console.warn(warningMessage);
-      
-    } catch (error: unknown) {
-      console.error(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
+  for (const prop of response.property) {
+    // Check identifier within array element
+    if (prop?.identifier?.attomId) {
+      writeLog(`[Fallback] Found attomId in property array identifier: ${prop.identifier.attomId}`);
+      return prop.identifier.attomId.toString();
     }
     
-    // Only sleep if we're going to retry
-    if (attempts < MAX_FALLBACK_ATTEMPTS - 1) {
-      await sleep(FALLBACK_DELAY_MS);
+    // Check direct attomId within array element
+    if (prop?.attomId) {
+      writeLog(`[Fallback] Found attomId directly in property array element: ${prop.attomId}`);
+      return prop.attomId.toString();
+    }
+    
+    // Check identifier 'Id' within array element - just log, don't return
+    if (prop?.identifier?.Id) {
+       writeLog(`[Fallback] Found Id in property array identifier: ${prop.identifier.Id} (Using as fallback)`);
     }
   }
   
-  console.error(`[Fallback] Failed to get attomId after ${MAX_FALLBACK_ATTEMPTS} attempts`);
-  return '';
+  return null;
+}
+
+/**
+ * Extract ATTOM ID from various response structures
+ * Main function with reduced cognitive complexity
+ */
+export function extractAttomIdFromResponse(response: any): string | null {
+  if (!response) {
+    writeLog('[Fallback] Response is null or undefined.');
+    return null;
+  }
+
+  // Try each potential ATTOM ID location in priority order
+  const attomId = checkStatusAttomId(response) ?? 
+                  checkPropertyIdentifierAttomId(response) ??
+                  checkDirectPropertyAttomId(response) ??
+                  checkPropertyArrayAttomIds(response);
+                  
+  if (!attomId) {
+    writeLog('[Fallback] No valid ATTOM ID found in response structure.');
+  }
+  
+  // Note: We intentionally do not check assessment.parcelNumber or sale.parcelNumber as these are different identifiers
+  // and not ATTOM IDs.
+  
+  return attomId;
 }
 
 /**
@@ -168,10 +195,10 @@ async function fetchPropertyDetailForGeoIdV4(attomId: string): Promise<any> {
       const warningMessage = result?.status === 'ok' 
         ? '[Fallback] Got successful response but no geoIdV4 found'
         : `[Fallback] Attempt ${attempts + 1} failed: Invalid response`;
-      console.warn(warningMessage);
+      writeLog(warningMessage);
       
     } catch (error: unknown) {
-      console.error(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
+      writeLog(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     
     // Only sleep if we're going to retry
@@ -180,7 +207,7 @@ async function fetchPropertyDetailForGeoIdV4(attomId: string): Promise<any> {
     }
   }
   
-  console.error(`[Fallback] Failed to get geoIdV4 after ${MAX_FALLBACK_ATTEMPTS} attempts`);
+  writeLog(`[Fallback] Failed to get geoIdV4 after ${MAX_FALLBACK_ATTEMPTS} attempts`);
   return null;
 }
 
@@ -210,7 +237,7 @@ export async function fallbackGeoIdV4FromAttomId(
     return cache.geoIdV4;
   }
   
-  console.warn(`[Fallback] calling /property/detail => geoIdV4 for attomId: ${attomId}`);
+  writeLog(`[Fallback] calling /property/detail => geoIdV4 for attomId: ${attomId}`);
   
   // Fetch property details with retry logic
   const result = await fetchPropertyDetailForGeoIdV4(attomId);
@@ -255,7 +282,7 @@ export async function fallbackSchoolByGeoIdV4(geoIdV4: string): Promise<any> {
  * @returns School profile data or null
  */
 async function fetchSchoolProfileData(geoIdV4: string): Promise<any> {
-  console.warn(`[Fallback] calling /v4/school/profile for geoIdV4: ${geoIdV4}`);
+  writeLog(`[Fallback] calling /v4/school/profile for geoIdV4: ${geoIdV4}`);
   
   let attempts = 0;
   
@@ -270,10 +297,10 @@ async function fetchSchoolProfileData(geoIdV4: string): Promise<any> {
     } catch (error: unknown) {
       attempts++;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[Fallback] Attempt ${attempts} failed: ${errorMessage}`);
+      writeLog(`[Fallback] Attempt ${attempts} failed: ${errorMessage}`);
       
       if (attempts >= MAX_FALLBACK_ATTEMPTS) {
-        console.error(`[Fallback] Failed to get school data after ${MAX_FALLBACK_ATTEMPTS} attempts: ${errorMessage}`);
+        writeLog(`[Fallback] Failed to get school data after ${MAX_FALLBACK_ATTEMPTS} attempts: ${errorMessage}`);
         return null;
       }
       
@@ -291,7 +318,7 @@ async function fetchSchoolProfileData(geoIdV4: string): Promise<any> {
  */
 export async function fallbackCommunityByGeoIdV4(geoIdV4: string): Promise<any> {
   if (!geoIdV4?.startsWith('N2')) {
-    console.error(`[Fallback] Invalid GeoID V4 for community: ${geoIdV4}`);
+    writeLog(`[Fallback] Invalid GeoID V4 for community: ${geoIdV4}`);
     return null;
   }
   
@@ -302,7 +329,7 @@ export async function fallbackCommunityByGeoIdV4(geoIdV4: string): Promise<any> 
     return cachedData;
   }
   
-  console.warn(`[Fallback] calling /neighborhood/community for geoIdV4: ${geoIdV4}`);
+  writeLog(`[Fallback] calling /neighborhood/community for geoIdV4: ${geoIdV4}`);
   
   let communityData = null;
   
@@ -314,10 +341,10 @@ export async function fallbackCommunityByGeoIdV4(geoIdV4: string): Promise<any> 
         break; // Successfully got the data
       }
       
-      console.warn(`[Fallback] Attempt ${attempts + 1} failed: Invalid response status`);
+      writeLog(`[Fallback] Attempt ${attempts + 1} failed: Invalid response status`);
       
     } catch (error: unknown) {
-      console.error(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
+      writeLog(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     
     // Only sleep if we're going to retry
@@ -335,13 +362,13 @@ export async function fallbackCommunityByGeoIdV4(geoIdV4: string): Promise<any> 
 }
 
 /**
- * Helper function to fetch property detail with retry logic
+ * Helper function to fetch building permits with retry logic
  * Extracted to reduce cognitive complexity
  * @param address1 Normalized street address
  * @param address2 Normalized city, state, ZIP
- * @returns Property detail response or null
+ * @returns Building permits response or null
  */
-async function fetchPropertyDetailWithRetry(
+async function fetchBuildingPermitsWithRetry(
   address1: string,
   address2: string
 ): Promise<any> {
@@ -350,22 +377,24 @@ async function fetchPropertyDetailWithRetry(
   
   while (attempts < MAX_FALLBACK_ATTEMPTS) {
     try {
-      detail = await fetchAttom('/propertyapi/v1.0.0/property/detail', { 
+      detail = await fetchAttom('/propertyapi/v1.0.0/property/buildingpermits', { 
         address1, 
         address2 
       });
       
-      if (detail?.status === 'ok' && detail?.property?.[0]?.location?.geoIdV4) {
-        return detail; // Successfully got the data
+      // Log the response for debugging
+      writeLog(`[Fallback] Building permits response: ${JSON.stringify(detail, null, 2)}`);      
+      if (detail?.status === 'ok' && detail?.property?.[0]?.identifier?.attomId) {
+        return detail; // Successfully got the data with ATTOM ID
       }
       
       // If we got a response but it doesn't have the data we need
       if (detail?.status === 'ok') {
-        console.warn('[Fallback] Got successful response but no geoIdV4 data');
+        writeLog('[Fallback] Got successful response but no attomId data');
       }
       
     } catch (error: unknown) {
-      console.error(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
+      writeLog(`[Fallback] Attempt ${attempts + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     
     attempts++;
@@ -375,9 +404,39 @@ async function fetchPropertyDetailWithRetry(
   }
   
   if (attempts >= MAX_FALLBACK_ATTEMPTS) {
-    console.error(`[Fallback] Failed to get property detail after ${MAX_FALLBACK_ATTEMPTS} attempts`);
+    writeLog(`[Fallback] Failed to get building permits after ${MAX_FALLBACK_ATTEMPTS} attempts`);
   }
   
+  return detail;
+}
+
+/**
+ * Helper function to fetch basic profile with retry logic
+ * @param address1 Normalized street address
+ * @param address2 Normalized city, state, ZIP
+ * @returns Basic profile response or null
+ */
+async function fetchBasicProfileWithRetry(
+  address1: string,
+  address2: string
+): Promise<any> {
+  let detail: any = null;
+  for (let attempts = 0; attempts < MAX_FALLBACK_ATTEMPTS; attempts++) {
+    try {
+      detail = await fetchAttom('/propertyapi/v1.0.0/property/basicprofile', {
+        address1,
+        address2,
+      });
+      if (detail?.status === 'ok' || detail?.status?.code === 0) {
+        return detail;
+      }
+    } catch (error: unknown) {
+      writeLog(`[Fallback] Attempt ${attempts + 1} failed for basicprofile: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (attempts < MAX_FALLBACK_ATTEMPTS - 1) {
+      await sleep(FALLBACK_DELAY_MS);
+    }
+  }
   return detail;
 }
 
@@ -394,9 +453,21 @@ async function fetchPropertyDetailWithRetry(
  * Interface for the request cache structure
  * This helps TypeScript understand the shape of our cache object
  */
+/**
+ * Interface for the GeoID cache structure
+ * Stores mapping of subtypes to GeoID values
+ */
 interface GeoIdCache {
   geoIdV4: Record<string, string>;
-  attomid?: string;
+  [key: string]: any;
+}
+
+/**
+ * Interface for the ATTOM ID cache structure
+ * Stores the ATTOM ID for an address
+ */
+interface AttomIdCache {
+  attomid: string;
   [key: string]: any;
 }
 
@@ -428,7 +499,7 @@ export async function fallbackGeoIdV4SubtypeCached(
     return cachedGeoId;
   }
   
-  console.warn(`[Fallback] calling /property/detail => geoIdV4 for subtype: ${subtype}`);
+  writeLog(`[Fallback] calling /property/buildingpermits => geoIdV4 for subtype: ${subtype}`);
   
   // Try to normalize the address using Google Places if enabled
   const { normalizedAddress1, normalizedAddress2 } = await normalizeAddressIfEnabled(
@@ -437,8 +508,11 @@ export async function fallbackGeoIdV4SubtypeCached(
     useGoogleNormalization
   );
   
-  // Fetch property details with retry logic
-  const detail = await fetchPropertyDetailWithRetry(normalizedAddress1, normalizedAddress2);
+  // Fetch building permits with retry logic
+  const detail = await fetchBuildingPermitsWithRetry(
+    normalizedAddress1,
+    normalizedAddress2
+  );
   
   // Process geoIdV4 data if available
   if (detail?.property?.[0]?.location?.geoIdV4) {
@@ -459,9 +533,86 @@ export async function fallbackGeoIdV4SubtypeCached(
   // We know cache.geoIdV4 is defined because we initialized it at the beginning of the function
   Object.entries(cache.geoIdV4).forEach(([key, value]) => {
     if (value) { // Only cache non-empty values
-      cacheData(`geoIdV4:${address1}:${address2}:${key}`, value, '/propertyapi/v1.0.0/property/detail');
+      cacheData(`geoIdV4:${address1}:${address2}:${key}`, value, '/propertyapi/v1.0.0/property/buildingpermits');
     }
   });
   
   return cache.geoIdV4[subtype] ?? '';
+
+}
+
+/**
+ * Attempts to retrieve an ATTOM ID using address parameters via fallback endpoints.
+ * Includes caching, normalization, and retry logic.
+ * 
+ * @param address1 The first line of the address
+ * @param address2 The second line of the address (city, state, zip)
+ * @param cacheKey Key for caching the result
+ * @param useGoogleNormalization Whether to use Google Places for address normalization
+ * @returns The found ATTOM ID string, or empty string if not found
+ */
+export async function fallbackAttomIdFromAddressCached(
+  address1: string,
+  address2: string,
+  cacheKey: string,
+  useGoogleNormalization: boolean = true
+): Promise<string> {
+  // Type assertion for cache structure - use dedicated AttomIdCache interface
+  const cache = getRequestCache(cacheKey) as AttomIdCache;
+  
+  // Initialize attomid if it doesn't exist in cache
+  if (!cache.attomid) {
+    cache.attomid = '';
+  }
+  
+  // If we already have the attomid in cache, use it
+  if (cache.attomid) {
+    writeLog(`[fallbackAttomIdFromAddressCached] Using cached ATTOM ID: ${cache.attomid}`);
+    return cache.attomid;
+  }
+  
+  // Check data cache first
+  const cacheDataKey = `attomid:${address1}:${address2}:${useGoogleNormalization ? 'google' : 'default'}`;
+  const cachedAttomId = getCachedData(cacheDataKey);
+  if (cachedAttomId) {
+    writeLog(`[fallbackAttomIdFromAddressCached] Using data-cached ATTOM ID: ${cachedAttomId}`);
+    cache.attomid = cachedAttomId;
+    return cachedAttomId;
+  }
+  
+  writeLog(`[fallbackAttomIdFromAddressCached] Looking up ATTOM ID for address: ${address1}, ${address2}`);
+  
+  // Try to normalize the address using Google Places if enabled
+  const normalizedAddressResult = await normalizeAddressIfEnabled(
+    address1, 
+    address2, 
+    useGoogleNormalization
+  );
+  
+  // If normalization failed, use original addresses
+  const normalizedAddress1 = normalizedAddressResult.normalizedAddress1 || address1;
+  const normalizedAddress2 = normalizedAddressResult.normalizedAddress2 || address2;
+  
+  writeLog(`[fallbackAttomIdFromAddressCached] Using normalized addresses: ${normalizedAddress1}, ${normalizedAddress2}`);
+  
+  // Attempt ATTOM ID extraction using helpers with retry logic
+  const candidateResponses = [
+    await fetchBuildingPermitsWithRetry(normalizedAddress1, normalizedAddress2),
+    await fetchBasicProfileWithRetry(normalizedAddress1, normalizedAddress2),
+  ];
+
+  for (const response of candidateResponses) {
+    const attomId = extractAttomIdFromResponse(response);
+    if (attomId) {
+      writeLog(`[fallbackAttomIdFromAddressCached] Found ATTOM ID via helper`);
+      cache.attomid = attomId;
+      cacheData(cacheDataKey, attomId, 'fallback-helpers');
+      return attomId;
+    }
+  }
+  
+  // If we reach here, no ATTOM ID was found
+  writeLog('[fallbackAttomIdFromAddressCached] Failed to find ATTOM ID after trying all endpoints');
+  cacheData(cacheDataKey, '', 'fallback-failure'); // Cache failure
+  return '';
 }

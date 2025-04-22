@@ -7,6 +7,7 @@
 
 import { executeQuery, isValidQuery } from './queryManager.js';
 import { EndpointCategory, getEndpointsByCategory, AllEventsDataField, endpoints } from '../config/endpointConfig.js';
+import { fetchAttom } from '../utils/fetcher.js';
 
 /**
  * ATTOM API Service class
@@ -19,6 +20,87 @@ export class AttomService {
    * @returns API response
    */
   public async executeQuery(queryType: string, params: Record<string, any>): Promise<any> {
+    // Special direct execution path for sales comparables endpoints
+    if (queryType === 'salesComparablesAddress' || queryType === 'salesComparablesPropId') {
+      console.log(`[AttomService:executeQuery] Special handling for ${queryType} endpoint`);
+      console.log(`[AttomService:executeQuery] Received params:`, JSON.stringify(params));
+      
+      // Ensure we have the essential parameters based on endpoint type
+      if (queryType === 'salesComparablesAddress' && (!params.street || !params.city || !params.state || !params.zip)) {
+        throw new Error(`Missing required parameters for ${queryType}`);
+      } else if (queryType === 'salesComparablesPropId' && !params.propId) {
+        throw new Error(`Missing required propId parameter for ${queryType}`);
+      }
+      
+      // Use the API framework directly
+      if (queryType === 'salesComparablesAddress') {
+        // Create a copy of the params that we can modify
+        const queryParams: Record<string, any> = {};
+        
+        // Extract path parameters
+        const street = params.street as string;
+        const city = params.city as string;
+        const county = (params.county as string) ?? '-';
+        const state = params.state as string;
+        const zip = params.zip as string;
+        
+        // Add all the optional parameters with defaults
+        queryParams.searchType = params.searchType ?? 'Radius';
+        queryParams.minComps = params.minComps ?? 1;
+        queryParams.maxComps = params.maxComps ?? 10;
+        queryParams.miles = params.miles ?? 5;
+        queryParams.sameCity = params.sameCity ?? true;
+        queryParams.useSameTargetCode = params.useSameTargetCode ?? true;
+        queryParams.bedroomsRange = params.bedroomsRange ?? 1;
+        queryParams.bathroomRange = params.bathroomRange ?? 1;
+        queryParams.sqFeetRange = params.sqFeetRange ?? 600;
+        queryParams.lotSizeRange = params.lotSizeRange ?? 3000;
+        queryParams.saleDateRange = params.saleDateRange ?? 12;
+        queryParams.yearBuiltRange = params.yearBuiltRange ?? 20;
+        queryParams.ownerOccupied = params.ownerOccupied ?? 'Both';
+        queryParams.distressed = params.distressed ?? 'IncludeDistressed';
+        
+        console.log(`[AttomService:executeQuery] Enhanced sales comparables address params:`, JSON.stringify(queryParams));
+        
+        // Construct the URL with path parameters
+        const path = `/property/v2/salescomparables/address/${encodeURIComponent(street)}/${encodeURIComponent(city)}/${encodeURIComponent(county)}/${encodeURIComponent(state)}/${encodeURIComponent(zip)}`;
+        
+        // Make direct API call
+        return await fetchAttom(path, queryParams);
+      } else if (queryType === 'salesComparablesPropId') {
+        // Create a copy of the params that we can modify
+        const queryParams: Record<string, any> = {};
+        
+        // Extract the propId parameter
+        const propId = params.propId as string;
+        
+        // Add all the optional parameters with defaults
+        queryParams.searchType = params.searchType ?? 'Radius';
+        queryParams.minComps = params.minComps ?? 1;
+        queryParams.maxComps = params.maxComps ?? 10;
+        queryParams.miles = params.miles ?? 5;
+        queryParams.sameCity = params.sameCity ?? true;
+        queryParams.useSameTargetCode = params.useSameTargetCode ?? true;
+        queryParams.bedroomsRange = params.bedroomsRange ?? 1;
+        queryParams.bathroomRange = params.bathroomRange ?? 1;
+        queryParams.sqFeetRange = params.sqFeetRange ?? 600;
+        queryParams.lotSizeRange = params.lotSizeRange ?? 3000;
+        queryParams.saleDateRange = params.saleDateRange ?? 12;
+        queryParams.yearBuiltRange = params.yearBuiltRange ?? 20;
+        queryParams.ownerOccupied = params.ownerOccupied ?? 'Both';
+        queryParams.distressed = params.distressed ?? 'IncludeDistressed';
+        
+        console.log(`[AttomService:executeQuery] Enhanced sales comparables propId params:`, JSON.stringify(queryParams));
+        
+        // Construct the URL with the propId parameter
+        const path = `/property/v2/salescomparables/propid/${encodeURIComponent(propId)}`;
+        
+        // Make direct API call
+        return await fetchAttom(path, queryParams);
+      }
+    }
+    
+    // Standard validation and execution for other endpoints
     if (!isValidQuery(queryType, params)) {
       throw new Error(`Invalid query parameters for ${queryType}`);
     }
@@ -278,12 +360,82 @@ export class AttomService {
     minComps?: number;
     maxComps?: number;
     miles?: number;
+    sameCity?: boolean | string;
+    useSameTargetCode?: boolean | string;
+    useCode?: string;
+    bedroomsRange?: number;
+    bathroomRange?: number;
+    sqFeetRange?: number;
+    lotSizeRange?: number;
+    onlyPropertiesWithPool?: boolean | string;
+    saleDateRange?: number;
+    saleAmountRangeFrom?: number;
+    saleAmountRangeTo?: number;
+    unitNumberRange?: number;
+    yearBuiltRange?: number;
+    storiesRange?: number;
+    include0SalesAmounts?: boolean | string;
+    includeFullSalesOnly?: boolean | string;
+    ownerOccupied?: string;
+    distressed?: string;
   }): Promise<any> {
-    return this.executeQuery('salesComparablesAddress', params);
+    console.log('[attomService:getSalesComparablesAddress] Received params:', JSON.stringify(params));
+    
+    // Use specialized execution path for sales comparables address
+    return this.executeSalesComparablesAddressQuery(params);
   }
   
   /**
-   * Get sales comparables by property ID
+   * Specialized method for executing sales comparables by address query
+   * This bypasses standard validation and uses a direct path to the API
+   */
+  private async executeSalesComparablesAddressQuery(params: any): Promise<any> {
+    console.log('[executeSalesComparablesAddressQuery] Executing with params:', JSON.stringify(params));
+    
+    const { street, city, county = '-', state, zip } = params;
+    const queryParams = this.buildComparablesQueryParams(params);
+    
+    console.log('[executeSalesComparablesAddressQuery] Enhanced params:', JSON.stringify(queryParams));
+    
+    // Construct the URL with path parameters
+    const path = `/property/v2/salescomparables/address/${encodeURIComponent(street)}/${encodeURIComponent(city)}/${encodeURIComponent(county)}/${encodeURIComponent(state)}/${encodeURIComponent(zip)}`;
+    
+    console.log('[executeSalesComparablesAddressQuery] Making API request to path:', path);
+    
+    try {
+      const result = await fetchAttom(path, queryParams);
+      console.log('[executeSalesComparablesAddressQuery] API call successful');
+      return result;
+    } catch (error: any) {
+      const msg = error?.details?.body ?? error?.message ?? '';
+      const alreadyRetried = params.__retried === true;
+      if (!alreadyRetried && msg.includes('Unable to locate a property record')) {
+        console.warn('[executeSalesComparablesAddressQuery] No comps found – expanding ranges and retrying');
+        // Obtain livingSize via propertyBuildingPermits
+        let livingSize: number | undefined;
+        try {
+          const basic = await this.getPropertyBuildingPermits({ attomid: params.propId });
+          livingSize = basic?.property?.[0]?.building?.size?.universalsize ?? basic?.property?.[0]?.building?.area?.livingSize;
+        } catch (e) {
+          // Non‑critical: if size lookup fails we proceed with default.
+          console.warn('[executeSalesComparablesAddressQuery] Unable to fetch livingSize, using default', (e as Error).message);
+        }
+        const expandedSqFt = Math.round((livingSize ?? 2000) * 0.3);
+        const retryParams = {
+          ...params,
+          __retried: true,
+          sqFeetRange: expandedSqFt,
+          yearBuiltRange: 40,
+        };
+        return this.executeSalesComparablesAddressQuery(retryParams);
+      }
+      console.error('[executeSalesComparablesAddressQuery] API call failed:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get sales comparables by propId
    * @param params Query parameters
    * @returns Sales comparables
    */
@@ -293,8 +445,79 @@ export class AttomService {
     minComps?: number;
     maxComps?: number;
     miles?: number;
+    sameCity?: boolean | string;
+    useSameTargetCode?: boolean | string;
+    useCode?: string;
+    bedroomsRange?: number;
+    bathroomRange?: number;
+    sqFeetRange?: number;
+    sqFeetRangeTo?: number;
+    lotSizeRange?: number;
+    lotSizeRangeTo?: number;
+    saleDateRange?: number;
+    saleAmountRangeFrom?: number;
+    saleAmountRangeTo?: number;
+    unitNumberRange?: number;
+    yearBuiltRange?: number;
+    storiesRange?: number;
+    include0SalesAmounts?: boolean | string;
+    includeFullSalesOnly?: boolean | string;
+    ownerOccupied?: string;
+    distressed?: string;
   }): Promise<any> {
-    return this.executeQuery('salesComparablesPropId', params);
+    console.log('[attomService:getSalesComparablesPropId] Received params:', JSON.stringify(params));
+    
+    // Use specialized execution path for sales comparables propId
+    return this.executeSalesComparablesPropIdQuery(params);
+  }
+  
+  /**
+   * Specialized execution method for sales comparables by address
+   * @param params Query parameters
+   * @returns API response
+   */
+  private async executeSalesComparablesPropIdQuery(params: any): Promise<any> {
+    console.log('[executeSalesComparablesPropIdQuery] Executing with params:', JSON.stringify(params));
+    
+    const propId = params.propId as string;
+    const queryParams = this.buildComparablesQueryParams(params);
+    
+    console.log('[executeSalesComparablesPropIdQuery] Enhanced params:', JSON.stringify(queryParams));
+    
+    // Construct the URL with the propId parameter
+    const path = `/property/v2/salescomparables/propid/${encodeURIComponent(propId)}`;
+    
+    console.log('[executeSalesComparablesPropIdQuery] Making API request to path:', path);
+    
+    try {
+      const result = await fetchAttom(path, queryParams);
+      console.log('[executeSalesComparablesPropIdQuery] API call successful');
+      return result;
+    } catch (error: any) {
+      const msg = error?.details?.body ?? error?.message ?? '';
+      const alreadyRetried = params.__retried === true;
+      if (!alreadyRetried && msg.includes('Unable to locate a property record')) {
+        console.warn('[executeSalesComparablesPropIdQuery] No comps found – expanding ranges and retrying');
+        // fetch livingSize via propertyBuildingPermits
+        let livingSize: number | undefined;
+        try {
+          const basic = await this.getPropertyBuildingPermits({ attomid: params.propId });
+          livingSize = basic?.property?.[0]?.building?.size?.universalsize ?? basic?.property?.[0]?.building?.area?.livingSize;
+        } catch (e) {
+          console.warn('[executeSalesComparablesPropIdQuery] Unable to fetch livingSize, using default', (e as Error).message);
+        }
+        const expandedSqFt = Math.round((livingSize ?? 2000) * 0.3);
+        const retryParams = {
+          ...params,
+          __retried: true,
+          sqFeetRange: expandedSqFt,
+          yearBuiltRange: 40,
+        };
+        return this.executeSalesComparablesPropIdQuery(retryParams);
+      }
+      console.error('[executeSalesComparablesPropIdQuery] API call failed:', error);
+      throw error;
+    }
   }
   
   /**
@@ -388,9 +611,12 @@ export class AttomService {
     address: string;
     radius?: number;
     categoryName?: string;
-    recordLimit?: number;
+    zipcode?: string;
+    point?: string;
   }): Promise<any> {
-    return this.executeQuery('poiSearch', params);
+    // Import the fetcher directly to use the correct path
+    const { fetchAttom } = await import('../utils/fetcher.js');
+    return fetchAttom('/v4/neighborhood/poi', params);
   }
   
   /**
@@ -416,5 +642,42 @@ export class AttomService {
     
     const property = allEventsData.property[0];
     return !!property[field];
+  }
+  
+  /**
+   * Build comparables query parameters applying defaults and filtering undefined.
+   */
+  private buildComparablesQueryParams(params: Record<string, any>): Record<string, any> {
+    const defaults = {
+      searchType: 'Radius',
+      minComps: 1,
+      maxComps: 10,
+      miles: 5,
+      sameCity: true,
+      useSameTargetCode: true,
+      bedroomsRange: 1,
+      bathroomRange: 1,
+      sqFeetRange: 600,
+      lotSizeRange: 3000,
+      saleDateRange: 12,
+      yearBuiltRange: 20,
+      ownerOccupied: 'Both',
+      distressed: 'IncludeDistressed',
+    };
+    
+    const queryParams: Record<string, any> = { ...defaults, ...params };
+    
+    // Remove non‑API params
+    delete queryParams.street;
+    delete queryParams.city;
+    delete queryParams.county;
+    delete queryParams.state;
+    delete queryParams.zip;
+    delete queryParams.propId;
+    delete queryParams.__retried;
+    
+    // Strip undefined to avoid sending "undefined"
+    Object.keys(queryParams).forEach(key => queryParams[key] === undefined && delete queryParams[key]);
+    return queryParams;
   }
 }

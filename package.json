@@ -16,25 +16,28 @@
     "mcp:http": "npm run build:mcp && node dist/runMcpServer.js",
     "mcp:stdio": "npm run build:mcp && node dist/runMcpServer.js --stdio",
     "mcp:esm:http": "npm run build:mcp && cd src/mcp-esm && node mcpServer.js",
-    "mcp:esm:stdio": "npm run build:mcp && cd src/mcp-esm && node mcpServer.js --stdio"
+    "mcp:esm:stdio": "npm run build:mcp && cd src/mcp-esm && node mcpServer.js --stdio",
+    "dev:mcp:stdio": "node --import tsx src/runMcpServer.ts --stdio",
+    "lint:md": "markdownlint-cli2 README.md"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@modelcontextprotocol/sdk": "^1.10.1",
     "@types/express": "^4.17.21",
-    "@types/node": "^22.14.1",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.19.2",
     "node-fetch": "^3.3.2",
+    "undici": "^7.8.0",
     "yargs": "^17.7.2",
     "zod": "^3.24.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^20.14.11",
+    "@types/node": "^20.17.30",
     "@types/yargs": "^17.0.32",
+    "markdownlint-cli2": "^0.9.2",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
