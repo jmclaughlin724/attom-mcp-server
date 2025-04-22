@@ -180,6 +180,17 @@ export const endpoints: Record<string, EndpointConfig> = {
     cache: VOLATILE_CACHE,
   },
   
+  propertyDetailMortgageOwner: {
+    path: '/propertyapi/v1.0.0/property/detailmortgageowner',
+    category: EndpointCategory.MORTGAGE,
+    description: 'Property mortgage and owner details',
+    requiredParams: ['attomid'],
+    optionalParams: [],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
+    rateLimit: DEFAULT_RATE_LIMIT,
+    cache: PROPERTY_CACHE,
+  },
+  
   propertyBuildingPermits: {
     path: '/propertyapi/v1.0.0/property/buildingpermits',
     category: EndpointCategory.PERMIT,
@@ -370,6 +381,18 @@ export const endpoints: Record<string, EndpointConfig> = {
     cache: PROPERTY_CACHE,
   },
   
+  boundaryDetail: {
+    path: '/v4/area/boundary/detail',
+    category: EndpointCategory.COMMUNITY,
+    description: 'Get geographic boundary detail for a given geoIdV4',
+    requiredParams: ['geoIdV4'],
+    optionalParams: ['format'],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_GEOID,
+    preferredGeoIdSubtype: 'N2',
+    rateLimit: DEFAULT_RATE_LIMIT,
+    cache: PROPERTY_CACHE,
+  },
+  
   // School endpoints
   schoolSearch: {
     path: '/v4/school/search',
@@ -408,7 +431,7 @@ export const endpoints: Record<string, EndpointConfig> = {
   
   // POI endpoints
   poiSearch: {
-    path: '/v4/poi/search',
+    path: '/v4/neighborhood/poi',
     category: EndpointCategory.POI,
     description: 'Search for points of interest',
     requiredParams: ['address', 'categoryName', 'radius'],

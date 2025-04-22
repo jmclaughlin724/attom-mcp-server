@@ -22,7 +22,7 @@ describe('AttomService – sales comparables', () => {
   it('returns data for successful address query', async () => {
     fetchMock.mockResolvedValueOnce({ success: true });
 
-    const result = await (service as any).executeSalesComparablesAddressQuery(baseAddressParams);
+    const result = await service.getSalesComparablesAddress(baseAddressParams);
     expect(result).toEqual({ success: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -34,7 +34,7 @@ describe('AttomService – sales comparables', () => {
     fetchMock.mockRejectedValueOnce(noCompsErr);
     fetchMock.mockResolvedValueOnce({ success: true, retried: true });
 
-    const result = await (service as any).executeSalesComparablesAddressQuery({
+    const result = await service.getSalesComparablesAddress({
       ...baseAddressParams,
       propId: '51593484',
     });
@@ -50,7 +50,7 @@ describe('AttomService – sales comparables', () => {
     fetchMock.mockRejectedValueOnce(noCompsErr);
     fetchMock.mockResolvedValueOnce({ success: true });
 
-    const result = await (service as any).executeSalesComparablesPropIdQuery({
+    const result = await service.getSalesComparablesPropId({
       propId: '51593484',
     });
 
