@@ -178,8 +178,14 @@ export function createMcpServer() {
     return shape;
   }
 
-  // Register all ATTOM API tools from the groupedTools and mcpTools arrays
-  for (const tool of [...groupedTools, ...mcpTools]) {
+  // Decide whether to keep legacy per‑endpoint tools based on env flag
+  // If KEEP_LEGACY_TOOLS is set to the string "true" we append the older one‑endpoint tools.
+  // Otherwise (unset, "false", any other value) we expose only the 4 grouped tools.
+  const includeLegacyTools = process.env.KEEP_LEGACY_TOOLS === 'false';
+  const toolsToRegister = includeLegacyTools ? [...groupedTools, ...mcpTools] : groupedTools;
+
+  // Register ATTOM API tools (grouped + optional legacy)
+  for (const tool of toolsToRegister) {
     let zodShape: z.ZodRawShape = {};
 
     if (tool.parameters.type === 'object' && tool.parameters.properties) {
