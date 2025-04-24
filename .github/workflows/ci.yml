@@ -22,6 +22,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Ensure ATTOM_API_KEY (fallback for forks)
+        if: ${{ env.ATTOM_API_KEY == '' }}
+        run: echo "ATTOM_API_KEY=DEMO_KEY" >> $GITHUB_ENV
+
       - name: Write .env file
         run: |
           echo "ATTOM_API_KEY=$ATTOM_API_KEY" > .env
