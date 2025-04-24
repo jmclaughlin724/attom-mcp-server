@@ -25,7 +25,6 @@ const endpointTTL: Record<string, number> = {
   '/propertyapi/v1.0.0/property/detail': 86400, // 24 hours
   '/propertyapi/v1.0.0/property/basicprofile': 86400, // 24 hours
   '/propertyapi/v1.0.0/property/expandedprofile': 86400, // 24 hours
-  '/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}': 86400, // 24 hours
   '/property/v2/salescomparables/propid/{propId}': 86400, // 24 hours
   '/propertyapi/v1.0.0/assessment/detail': 86400, // 24 hours
   '/propertyapi/v1.0.0/assessmenthistory/detail': 86400, // 24 hours

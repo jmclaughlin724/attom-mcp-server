@@ -41,7 +41,6 @@ describe('Endpoint coverage – executes every configured endpoint', () => {
   });
 
   const excluded = new Set([
-    'salesComparablesAddress',
     'salesComparablesPropId', // Have dedicated tests already
   ]);
 

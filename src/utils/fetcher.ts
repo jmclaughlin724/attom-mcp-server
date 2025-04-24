@@ -3,9 +3,19 @@ import { URLSearchParams } from 'url';
 import { fetch } from 'undici'; // Use installed undici fetch
 import { writeLog } from './logger.js'; // Import from new logger module
 import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-// Load environment variables
-dotenv.config();
+// Resolve project root (two levels up from this file) and load environment variables explicitly.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+// Fail fast if the required API key is not present. This prevents accidental use of the DEMO_KEY fallback.
+if (!process.env.ATTOM_API_KEY) {
+  throw new Error(
+    'ATTOM_API_KEY not loaded – make sure .env exists at the project root and the process is started from that directory.'
+  );
+}
 
 /**
  * Helper function to build the request URL
@@ -70,6 +80,54 @@ function handleFinalError(err: unknown, maxRetries: number, url: string): never 
 }
 
 /**
+ * Helper function to replace path placeholders (e.g. {street}) with matching values from the query object.
+ * Mutates a shallow clone of the original query object, leaving the input intact.
+ *
+ * @param rawPath Endpoint path potentially containing placeholders
+ * @param query   Original query parameters
+ * @returns Tuple of the final path and a query object with any consumed parameters removed
+ */
+function substitutePathParams(
+  rawPath: string,
+  query: Record<string, any>
+): { path: string; remainingQuery: Record<string, any> } {
+  if (!rawPath.includes('{')) {
+    // Fast‑exit if no placeholders
+    return { path: rawPath, remainingQuery: { ...query } };
+  }
+
+  const remaining: Record<string, any> = { ...query };
+  let finalPath = rawPath;
+
+  const placeholderRegex = /{([^}]+)}/g; // Matches {param}
+  let match: RegExpExecArray | null;
+
+  while ((match = placeholderRegex.exec(rawPath)) !== null) {
+    const placeholder = match[0]; // e.g. {street}
+    const keyRaw = match[1]; // e.g. street
+
+    // Find the corresponding key in the query (case‑insensitive)
+    const key = Object.keys(remaining).find(
+      (k) => k.toLowerCase() === keyRaw.toLowerCase()
+    );
+
+    if (key && remaining[key] !== undefined && remaining[key] !== null) {
+      const value = encodeURIComponent(String(remaining[key]));
+      finalPath = finalPath.replace(placeholder, value);
+      delete remaining[key];
+    } else {
+      // If we cannot resolve the placeholder, replace with '-' to satisfy ATTOM V2 path format
+      finalPath = finalPath.replace(placeholder, '-');
+      writeLog(
+        `[Fetcher] Placeholder ${placeholder} not provided; substituting '-' in final path.`
+      );
+    }
+  }
+
+  return { path: finalPath, remainingQuery: remaining };
+}
+
+/**
  * Main function to fetch data from ATTOM API with retry logic
  */
 export async function fetchAttom(
@@ -91,10 +149,15 @@ export async function fetchAttom(
       console.log('[Fetcher] Redirecting POI request from /v4/poi/search to /v4/neighborhood/poi');
       path = '/v4/neighborhood/poi';
     }
+
+    // Substitute any {placeholder} tokens in the endpoint
+    const substitution = substitutePathParams(path, query);
+    path = substitution.path;
+    query = substitution.remainingQuery;
     
-    console.log(`[Fetcher] Final endpoint path: ${path}`);
+    console.log(`[Fetcher] Final endpoint path after substitution: ${path}`);
   } catch (error) {
-    console.error('[Fetcher] Error in path redirection:', error);
+    console.error('[Fetcher] Error in path redirection/substitution:', error);
   }
   const baseUrl = process.env.ATTOM_API_BASE_URL ?? 'https://api.gateway.attomdata.com';
   const method = overrides?.method ?? 'GET';

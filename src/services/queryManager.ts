@@ -347,6 +347,9 @@ export async function executeQuery(
   endpointKey: string, 
   params: Record<string, any>
 ): Promise<Record<string, unknown>> {
+  // Quick diagnostic log to confirm that all external calls route through QueryManager
+  writeLog(`[QueryManager] hit: ${endpointKey} | params: ${JSON.stringify(params)}`);
+
   // *** ADDED LOGGING ***
   writeLog(`[QueryManager:executeQuery] ENTERED. Endpoint: ${endpointKey}, Params: ${JSON.stringify(params)}`);
 
@@ -428,47 +431,6 @@ export function isValidSalesComparablesQuery(endpointKey: string, params: Record
   // Ensure all parameters are normalized to the expected types
   const normalizedParams = normalizeParams(params);
   
-  // Sales comparables address validation
-  if (endpointKey === 'salesComparablesAddress') {
-    // Required path parameters for address endpoint
-    const requiredParams = ['street', 'city', 'state', 'zip'];
-    const hasAllRequired = requiredParams.every(param => normalizedParams[param] !== undefined);
-    
-    if (!hasAllRequired) {
-      console.log(`[isValidSalesComparablesQuery] Address endpoint required params check: FAILED - missing required parameters`);
-      return false;
-    }
-    
-    // Fill in optional params with default values to ensure they pass validation
-    const completeParams = {
-      ...normalizedParams,
-      county: normalizedParams.county ?? '-',
-      searchType: normalizedParams.searchType ?? 'Radius',
-      minComps: normalizedParams.minComps ?? 1,
-      maxComps: normalizedParams.maxComps ?? 10,
-      miles: normalizedParams.miles ?? 5,
-      sameCity: normalizedParams.sameCity ?? 'true',
-      useSameTargetCode: normalizedParams.useSameTargetCode ?? 'true',
-      bedroomsRange: normalizedParams.bedroomsRange ?? 1,
-      bathroomRange: normalizedParams.bathroomRange ?? 1,
-      sqFeetRange: normalizedParams.sqFeetRange ?? 600,
-      lotSizeRange: normalizedParams.lotSizeRange ?? 3000,
-      saleDateRange: normalizedParams.saleDateRange ?? 12,
-      yearBuiltRange: normalizedParams.yearBuiltRange ?? 20,
-      ownerOccupied: normalizedParams.ownerOccupied ?? 'Both',
-      distressed: normalizedParams.distressed ?? 'IncludeDistressed'
-    };
-    
-    // Make sure these modified params are available for later steps
-    for (const [key, value] of Object.entries(completeParams)) {
-      params[key] = value;
-    }
-    
-    console.log(`[isValidSalesComparablesQuery] Address endpoint params check: PASSED with complete params`);
-    console.log(`[isValidSalesComparablesQuery] Complete params:`, JSON.stringify(completeParams));
-    return true;
-  }
-  
   // Sales comparables propId validation
   if (endpointKey === 'salesComparablesPropId') {
     // Only propId is required for this endpoint
@@ -513,38 +475,6 @@ export function isValidSalesComparablesQuery(endpointKey: string, params: Record
 }
 
 /**
- * Helper function to normalize parameter types
- */
-function normalizeParams(params: Record<string, any>): Record<string, any> {
-  const result: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null) {
-      continue;
-    }
-    
-    // Convert boolean strings to actual booleans
-    if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
-      result[key] = value.toLowerCase() === 'true';
-    }
-    // Maintain numeric values as numbers
-    else if (typeof value === 'number') {
-      result[key] = value;
-    }
-    // Convert numeric strings to numbers if appropriate
-    else if (typeof value === 'string' && !isNaN(Number(value)) && !value.includes(' ')) {
-      result[key] = Number(value);
-    }
-    // Otherwise keep as is
-    else {
-      result[key] = value;
-    }
-  }
-  
-  return result;
-}
-
-/**
  * Check if a query is valid based on required parameters
  * @param endpointKey Endpoint key
  * @param params Query parameters
@@ -556,7 +486,7 @@ export function isValidQuery(endpointKey: string, params: Record<string, any>): 
     console.log(`[isValidQuery] Parameters received:`, JSON.stringify(params));
     
     // Special handling for sales comparables endpoints
-    if (endpointKey === 'salesComparablesAddress' || endpointKey === 'salesComparablesPropId') {
+    if (endpointKey === 'salesComparablesPropId') {
       return isValidSalesComparablesQuery(endpointKey, params);
     }
     
@@ -886,4 +816,36 @@ export async function executeAttomQuery(
   requestQueue.set(cacheKey, requestPromise);
 
   return requestPromise;
+}
+
+/**
+ * Helper function to normalize parameter types
+ */
+function normalizeParams(params: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    
+    // Convert boolean strings to actual booleans
+    if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
+      result[key] = value.toLowerCase() === 'true';
+    }
+    // Maintain numeric values as numbers
+    else if (typeof value === 'number') {
+      result[key] = value;
+    }
+    // Convert numeric strings to numbers if appropriate
+    else if (typeof value === 'string' && !isNaN(Number(value)) && !value.includes(' ')) {
+      result[key] = Number(value);
+    }
+    // Otherwise keep as is
+    else {
+      result[key] = value;
+    }
+  }
+  
+  return result;
 }

@@ -454,24 +454,6 @@ export const endpoints: Record<string, EndpointConfig> = {
   },
   
   // Sales comparables endpoints
-  salesComparablesAddress: {
-    path: '/property/v2/salescomparables/address/{street}/{city}/{county}/{state}/{zip}',
-    category: EndpointCategory.SALE,
-    description: 'Get sales comparables for a property by address',
-    requiredParams: ['street', 'city', 'state', 'zip'],
-    optionalParams: [
-      'county', 'searchType', 'minComps', 'maxComps', 'miles', 
-      'sameCity', 'useSameTargetCode', 'useCode', 'bedroomsRange', 
-      'bathroomRange', 'sqFeetRange', 'lotSizeRange', 'onlyPropertiesWithPool',
-      'saleDateRange', 'saleAmountRangeFrom', 'saleAmountRangeTo', 'unitNumberRange',
-      'yearBuiltRange', 'storiesRange', 'include0SalesAmounts', 'includeFullSalesOnly',
-      'ownerOccupied', 'distressed'
-    ],
-    fallbackStrategy: FallbackStrategy.NONE,
-    rateLimit: DEFAULT_RATE_LIMIT,
-    cache: VOLATILE_CACHE // Use volatile cache since comparables change more frequently
-  },
-
   salesComparablesPropId: {
     path: '/property/v2/salescomparables/propid/{propId}',
     category: EndpointCategory.SALE,

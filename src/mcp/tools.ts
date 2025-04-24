@@ -49,36 +49,6 @@ interface GeographicBoundaryParams {
   geoIdV4: string;
 }
 
-interface SalesComparablesAddressParams {
-  street: string;
-  city: string;
-  county: string;
-  state: string;
-  zip: string;
-  searchType?: string;
-  minComps?: number;
-  maxComps?: number;
-  miles?: number;
-  sameCity?: boolean | string;
-  useSameTargetCode?: boolean | string;
-  useCode?: string;
-  bedroomsRange?: number;
-  bathroomRange?: number;
-  sqFeetRange?: number;
-  lotSizeRange?: number;
-  onlyPropertiesWithPool?: boolean | string;
-  saleDateRange?: number;
-  saleAmountRangeFrom?: number;
-  saleAmountRangeTo?: number;
-  unitNumberRange?: number;
-  yearBuiltRange?: number;
-  storiesRange?: number;
-  include0SalesAmounts?: boolean | string;
-  includeFullSalesOnly?: boolean | string;
-  ownerOccupied?: string;
-  distressed?: string;
-}
-
 interface SalesComparablesPropIdParams {
   propId: string;
   searchType?: string;
@@ -554,83 +524,6 @@ export const mcpTools = [
     handler: async (params: AllEventsParams) => {
       const { id } = params;
       return attomService.getAllEventsSnapshot({ id });
-    }
-  },
-  {
-    name: 'get_sales_comparables_address',
-    description: 'Get sales comparables by address',
-    parameters: {
-      type: 'object',
-      properties: {
-        street: { type: 'string', description: 'Street address' },
-        city: { type: 'string', description: 'City' },
-        county: { type: 'string', description: 'County' },
-        state: { type: 'string', description: 'State' },
-        zip: { type: 'string', description: 'ZIP code' },
-        searchType: { type: 'string', description: 'Search type [Radius, ApnBookAndPage, ApnBook, ZipCode, SubdivisionTract, Countywide]' },
-        minComps: { type: 'number', description: 'Minimum number of comparables (Default: 1)' },
-        maxComps: { type: 'number', description: 'Maximum number of comparables (Default: 10)' },
-        miles: { type: 'number', description: 'Search radius in miles (Default: 5)' },
-        sameCity: { type: 'boolean', description: 'Search Method: Same City (Default: false)' },
-        useSameTargetCode: { type: 'boolean', description: 'Use Code: Use Code Same as Target Property (Default: true)' },
-        useCode: { type: 'string', description: 'Use Code: Selected Use Codes (Default: NULL)' },
-        bedroomsRange: { type: 'number', description: 'Property Characteristics: Bedrooms Range (Default: 2)' },
-        bathroomRange: { type: 'number', description: 'Property Characteristics: Bathrooms Range (Default: 2)' },
-        sqFeetRange: { type: 'number', description: 'Property Characteristics: Square Feet Range (Default: 600)' },
-        lotSizeRange: { type: 'number', description: 'Property Characteristics: Lot Size Range (Default: 2000)' },
-        onlyPropertiesWithPool: { type: 'boolean', description: 'Property Characteristics: Only Properties With Pool (Default: false)' },
-        saleDateRange: { type: 'number', description: 'Property Characteristics: Sale Date Range in months (Default: 6)' },
-        saleAmountRangeFrom: { type: 'number', description: 'Property Characteristics: Sale Amount Range From (Default: NULL)' },
-        saleAmountRangeTo: { type: 'number', description: 'Property Characteristics: Sale Amount Range To (Default: NULL)' },
-        unitNumberRange: { type: 'number', description: 'Property Characteristics: Units Nr Range (Default: NULL)' },
-        yearBuiltRange: { type: 'number', description: 'Property Characteristics: Year Built Range (Default: 10)' },
-        storiesRange: { type: 'number', description: 'Property Characteristics: Stories Range (Default: NULL)' },
-        include0SalesAmounts: { type: 'boolean', description: 'Options: Include 0 Or Unknown Sales Amounts (Default: true)' },
-        includeFullSalesOnly: { type: 'boolean', description: 'Options: Include Full Sales Only (Default: false)' },
-        ownerOccupied: { type: 'string', description: 'Options: Owner Occupied [IncludeOwnerOccupiedOnly, IncludeAbsentOwnerOnly, Both] (Default: Both)' },
-        distressed: { type: 'string', description: 'Options: Distressed [ExcludeDistressed, OnlyDistressed, IncludeDistressed] (Default: IncludeDistressed)' }
-      },
-      required: ['street', 'city', 'state', 'zip']
-    },
-    handler: async (params: SalesComparablesAddressParams) => {
-      try {
-        // Log the raw parameters we received
-        console.log('[get_sales_comparables_address] Received params:', JSON.stringify(params));
-        
-        // Ensure county has a default value if not provided
-        const paramsWithDefaults = { 
-          ...params,
-          county: params.county ?? '-',
-          searchType: params.searchType ?? 'Radius',
-          minComps: params.minComps ?? 1,
-          maxComps: params.maxComps ?? 10,
-          miles: params.miles ?? 5,
-          sameCity: params.sameCity ?? 'true',
-          useSameTargetCode: params.useSameTargetCode ?? 'true',
-          bedroomsRange: params.bedroomsRange ?? 1,
-          bathroomRange: params.bathroomRange ?? 1,
-          sqFeetRange: params.sqFeetRange ?? 600,
-          lotSizeRange: params.lotSizeRange ?? 3000,
-          saleDateRange: params.saleDateRange ?? 12,
-          yearBuiltRange: params.yearBuiltRange ?? 20,
-          ownerOccupied: params.ownerOccupied ?? 'Both',
-          distressed: params.distressed ?? 'IncludeDistressed',
-          onlyPropertiesWithPool: params.onlyPropertiesWithPool ?? 'false',
-          include0SalesAmounts: params.include0SalesAmounts ?? 'true'
-        };
-        
-        console.log('[get_sales_comparables_address] Using params:', JSON.stringify(paramsWithDefaults));
-
-        // Use the attomService to make the API call
-        return attomService.getSalesComparablesAddress(paramsWithDefaults);
-      } catch (error) {
-        console.error('[get_sales_comparables_address] Error:', error);
-        return {
-          success: false,
-          error: `Error in sales comparables by address: ${error instanceof Error ? error.message : String(error)}`,
-          details: error instanceof Error ? error.stack : null
-        };
-      }
     }
   },
   {

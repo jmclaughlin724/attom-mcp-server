@@ -7,7 +7,6 @@
 
 import { executeQuery, isValidQuery } from './queryManager.js';
 import { EndpointCategory, getEndpointsByCategory, AllEventsDataField, endpoints } from '../config/endpointConfig.js';
-import { normalizeAddressStringForAttom } from '../utils/googlePlaces.js';
 import { fetchAttom } from '../utils/fetcher.js';
 
 /**
@@ -267,72 +266,6 @@ export class AttomService {
   }
   
   /**
-   * Get sales comparables by address
-   * @param params Query parameters
-   * @returns Sales comparables
-   */
-  public async getSalesComparablesAddress(params: {
-    street: string;
-    city: string;
-    county?: string;
-    state: string;
-    zip: string;
-    [key: string]: any;
-  }): Promise<any> {
-    console.log('[AttomService:getSalesComparablesAddress] Received params:', JSON.stringify(params));
-
-    // Always normalize address before forwarding
-    try {
-      const fullAddress = [params.street, params.city, params.state, params.zip].filter(Boolean).join(' ');
-      const normalized = await normalizeAddressStringForAttom(fullAddress);
-      if (normalized) {
-        const [normCity, stateZipRaw = ''] = normalized.address2.split(',');
-        const [normState, normZip] = stateZipRaw.trim().split(' ');
-        params = {
-          ...params,
-          street: normalized.address1,
-          city: normCity.trim() || params.city,
-          state: normState || params.state,
-          zip: normZip || params.zip,
-        };
-      }
-    } catch (err) {
-      console.warn('[AttomService:getSalesComparablesAddress] Address normalization failed:', err instanceof Error ? err.message : String(err));
-    }
-
-    // Ensure county placeholder
-    params.county = params.county ?? '-';
-
-    // Build query parameters with defaults and filters
-    const queryParams = this.buildComparablesQueryParams(params);
-
-    // Encode path components
-    const { street, city, county, state, zip } = params;
-    const encStreet = encodeURIComponent(street);
-    const encCity = encodeURIComponent(city);
-    const encCounty = encodeURIComponent(county ?? '-');
-    const encState = encodeURIComponent(state);
-    const encZip = encodeURIComponent(zip);
-    const path = `/property/v2/salescomparables/address/${encStreet}/${encCity}/${encCounty}/${encState}/${encZip}`;
-
-    try {
-      return await fetchAttom(path, queryParams);
-    } catch (error: any) {
-      const msg = error?.details?.body ?? error?.message ?? '';
-      const alreadyRetried = params.__retried === true;
-      if (!alreadyRetried && msg.includes('Unable to locate a property record')) {
-        return this.getSalesComparablesAddress({
-          ...params,
-          __retried: true,
-          sqFeetRange: 1000,
-          yearBuiltRange: 40,
-        } as any);
-      }
-      throw error;
-    }
-  }
-  
-  /**
    * Get sales comparables by propId
    * @param params Query parameters
    * @returns Sales comparables
@@ -504,6 +437,8 @@ export class AttomService {
       yearBuiltRange: 20,
       ownerOccupied: 'Both',
       distressed: 'IncludeDistressed',
+      include0SalesAmounts: true,
+      includeFullSalesOnly: false,
     };
     
     const queryParams: Record<string, any> = { ...defaults, ...params };

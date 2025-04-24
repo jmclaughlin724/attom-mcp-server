@@ -132,26 +132,73 @@ router.post('/get_all_events_snapshot', async (req: express.Request, res: expres
   }
 });
 
-// MCP endpoint for sales comparables by address
-router.post('/get_sales_comparables_address', async (req: express.Request, res: express.Response) => {
-  try {
-    const { street, city, county, state, zip, searchType, minComps, maxComps, miles } = req.body;
-    const data = await attomService.getSalesComparablesAddress({ 
-      street, city, county, state, zip, searchType, minComps, maxComps, miles 
-    });
-    return res.status(200).json(data);
-  } catch (error: unknown) {
-    return handleError(res, error);
-  }
-});
-
-// MCP endpoint for sales comparables by property ID
+// MCP endpoint for sales comparables by property ID (refactored to use QueryManager)
 router.post('/get_sales_comparables_propid', async (req: express.Request, res: express.Response) => {
   try {
-    const { propId, searchType, minComps, maxComps, miles } = req.body;
-    const data = await attomService.getSalesComparablesPropId({ 
-      propId, searchType, minComps, maxComps, miles 
-    });
+    const {
+      propId,
+      address1,
+      address2,
+      searchType,
+      minComps,
+      maxComps,
+      miles,
+      sameCity,
+      useSameTargetCode,
+      useCode,
+      bedroomsRange,
+      bathroomRange,
+      sqFeetRange,
+      lotSizeRange,
+      onlyPropertiesWithPool,
+      saleDateRange,
+      saleAmountRangeFrom,
+      saleAmountRangeTo,
+      unitNumberRange,
+      yearBuiltRange,
+      storiesRange,
+      include0SalesAmounts,
+      includeFullSalesOnly,
+      ownerOccupied,
+      distressed
+    } = req.body;
+
+    if (!propId && !(address1 && address2)) {
+      return res.status(400).json({
+        error: 'Missing required parameter: propId (or address1 & address2 for fallback).',
+        status: 'error'
+      });
+    }
+
+    const params: Record<string, any> = {
+      propId,
+      address1,
+      address2,
+      searchType,
+      minComps,
+      maxComps,
+      miles,
+      sameCity,
+      useSameTargetCode,
+      useCode,
+      bedroomsRange,
+      bathroomRange,
+      sqFeetRange,
+      lotSizeRange,
+      onlyPropertiesWithPool,
+      saleDateRange,
+      saleAmountRangeFrom,
+      saleAmountRangeTo,
+      unitNumberRange,
+      yearBuiltRange,
+      storiesRange,
+      include0SalesAmounts,
+      includeFullSalesOnly,
+      ownerOccupied,
+      distressed
+    };
+
+    const data = await executeQuery('salesComparablesPropId', params);
     return res.status(200).json(data);
   } catch (error: unknown) {
     return handleError(res, error);

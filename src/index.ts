@@ -358,55 +358,6 @@ async function main() {
       }
     )
 
-    // salescomparables.address
-    .command(
-      'salescomparables address',
-      'Sales comparables by address',
-      (yargs) =>
-        yargs
-          .option('street', { type: 'string', demandOption: true })
-          .option('city', { type: 'string', demandOption: true })
-          .option('county', { type: 'string', demandOption: true })
-          .option('state', { type: 'string', demandOption: true })
-          .option('zip', { type: 'string', demandOption: true })
-          .option('searchType', { type: 'string', default: 'asIs' })
-          .option('minComps', { type: 'number', default: 5 })
-          .option('maxComps', { type: 'number', default: 20 })
-          .option('miles', { type: 'number', default: 5 })
-          .option('sqFtRange', { type: 'number', default: 300 })
-          .option('lotSizeRange', { type: 'number', default: 2000 })
-          .option('bedroomRange', { type: 'number', default: 1 })
-          .option('bathroomRange', { type: 'number', default: 1 })
-          .option('yearBuiltRange', { type: 'number', default: 10 })
-          .option('saleDateRange', { type: 'number', default: 6 })
-          .option('ownerOccupied', { type: 'string', default: 'Both' })
-          .option('distressed', { type: 'string', default: 'IncludeDistressed' }),
-      async (argv) => {
-        // Create a properly typed params object for the address method
-        const params = {
-          street: argv.street,
-          city: argv.city,
-          county: argv.county,
-          state: argv.state,
-          zip: argv.zip,
-          searchType: argv.searchType,
-          minComps: argv.minComps,
-          maxComps: argv.maxComps,
-          miles: argv.miles,
-          sqFtRange: argv.sqFtRange,
-          lotSizeRange: argv.lotSizeRange,
-          bedroomRange: argv.bedroomRange,
-          bathroomRange: argv.bathroomRange,
-          yearBuiltRange: argv.yearBuiltRange,
-          saleDateRange: argv.saleDateRange,
-          ownerOccupied: argv.ownerOccupied,
-          distressed: argv.distressed,
-        };
-        const data = await attom.salescomparables.address(params);
-        console.log(JSON.stringify(data, null, 2));
-      }
-    )
-
     // salescomparables.propid
     .command(
       'salescomparables propid',
