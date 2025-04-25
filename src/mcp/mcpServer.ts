@@ -10,8 +10,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { mcpTools } from './tools.js'; 
-import { groupedTools } from './groupedTools.js'; // Import new groupedTools
+import { groupedTools } from './groupedTools.js'; // Import groupedTools
 import { AttomService } from "../services/attomService.js";
 import { normalizeAddressStringForAttom } from "../utils/googlePlaces.js";
 import { writeLog } from "../utils/logger.js";
@@ -30,118 +29,8 @@ export function createMcpServer() {
     description: "Access property data, sales history, and more through the ATTOM API"
   });
 
-  // Register address normalization tool
-  server.tool(
-    "normalize_address",
-    { address: z.string().describe("Full address to normalize (e.g., '123 Main St, Anytown, CA 12345')") },
-    async ({ address }: { address: string }) => {
-      try {
-        const normalized = await normalizeAddressStringForAttom(address);
-        
-        if (!normalized) {
-          return {
-            content: [{ 
-              type: "text", 
-              text: JSON.stringify({
-                success: false,
-                error: "Failed to normalize address",
-                original: address
-              }, null, 2)
-            }]
-          };
-        }
-        
-        return {
-          content: [{ 
-            type: "text", 
-            text: JSON.stringify({
-              success: true,
-              normalized: {
-                address1: normalized.address1,
-                address2: normalized.address2,
-                formattedAddress: normalized.formattedAddress,
-                latitude: normalized.latitude,
-                longitude: normalized.longitude
-              },
-              original: address
-            }, null, 2)
-          }]
-        };
-      } catch (error: any) {
-        return {
-          content: [{ 
-            type: "text", 
-            text: JSON.stringify({
-              success: false,
-              error: error.message ?? "Unknown error during address normalization",
-              original: address
-            }, null, 2)
-          }]
-        };
-      }
-    }
-  );
-
-  // Register property search tool
-  server.tool(
-    "search_property",
-    {
-      address1: z.string().describe("Street address (e.g., '123 Main St')"),
-      address2: z.string().describe("City, state, ZIP (e.g., 'Anytown, CA 12345')"),
-      useGoogleNormalization: z.boolean().optional().default(true).describe("Whether to use Google Places for address normalization")
-    },
-    async ({ address1, address2, useGoogleNormalization }: { address1: string, address2: string, useGoogleNormalization?: boolean }) => {
-      try {
-        let finalAddress1 = address1;
-        let finalAddress2 = address2;
-        
-        // Normalize address using Google Places if enabled
-        if (useGoogleNormalization) {
-          try {
-            const normalized = await normalizeAddressStringForAttom(`${address1}, ${address2}`);
-            if (normalized) {
-              finalAddress1 = normalized.address1;
-              finalAddress2 = normalized.address2;
-            }
-          } catch (error: unknown) {
-            console.warn('[Google Places] Address normalization failed, using original address', 
-              error instanceof Error ? error.message : String(error));
-          }
-        }
-        
-        // Fetch property data from ATTOM API
-        const propertyData = await attomService.executeQuery("propertyBasicProfile", {
-          address1: finalAddress1,
-          address2: finalAddress2
-        });
-        
-        return {
-          content: [{ 
-            type: "text", 
-            text: JSON.stringify({
-              success: true,
-              property: propertyData.property,
-              normalizedAddress: {
-                address1: finalAddress1,
-                address2: finalAddress2
-              }
-            }, null, 2)
-          }]
-        };
-      } catch (error: any) {
-        return {
-          content: [{ 
-            type: "text", 
-            text: JSON.stringify({
-              success: false,
-              error: error.message ?? "Unknown error during property search",
-              params: { address1, address2, useGoogleNormalization }
-            }, null, 2)
-          }]
-        };
-      }
-    }
-  );
+  // Standalone tools (normalize_address, search_property) removed to enforce
+  // interaction via groupedTools -> queryManager logic chain.
 
   // Helper function to create a Zod schema from JSON schema properties
   function createZodSchemaFromProperties(properties: any, required: readonly string[] = []): z.ZodRawShape {
@@ -181,11 +70,9 @@ export function createMcpServer() {
   // Decide whether to keep legacy per‑endpoint tools based on env flag
   // If KEEP_LEGACY_TOOLS is set to the string "true" we append the older one‑endpoint tools.
   // Otherwise (unset, "false", any other value) we expose only the 4 grouped tools.
-  const includeLegacyTools = process.env.KEEP_LEGACY_TOOLS === 'false';
-  const toolsToRegister = includeLegacyTools ? [...groupedTools, ...mcpTools] : groupedTools;
 
-  // Register ATTOM API tools (grouped + optional legacy)
-  for (const tool of toolsToRegister) {
+  // Register the grouped ATTOM API tools
+  for (const tool of groupedTools) {
     let zodShape: z.ZodRawShape = {};
 
     if (tool.parameters.type === 'object' && tool.parameters.properties) {
@@ -284,7 +171,7 @@ export async function startMcpServer(transportType: "stdio" | "http" = "http") {
     // Start receiving messages on stdin and sending messages on stdout
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("MCP server started with stdio transport");
+    console.error("MCP server started with stdio transport");
   } else {
     // Start HTTP server
     const transport = new StreamableHTTPServerTransport({ 
@@ -292,6 +179,6 @@ export async function startMcpServer(transportType: "stdio" | "http" = "http") {
       sessionIdGenerator: undefined
     });
     await server.connect(transport);
-    console.log(`MCP server started with HTTP transport`);
+    console.error(`MCP server started with HTTP transport`);
   }
 }

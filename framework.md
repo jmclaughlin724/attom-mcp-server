@@ -3,15 +3,11 @@
 ```plaintext
 attom_mcp/
 ├── src/
-│   ├── index.ts                  # (legacy) CLI entry point
-│   ├── runMcpServer.ts           # Starts the MCP server (CLI entry)
-│   ├── server.ts                 # Express HTTP wrapper (legacy)
-│   ├── attomApiFramework.ts      # Core API framework
+│   ├── runMcpServer.ts           # Starts the MCP server (MCP entry)
 │   ├── openapiRegistry.ts        # OpenAPI schema registry
 │   ├── mcp/
 │   │   ├── mcpServer.ts          # MCP server configuration and registration
-│   │   ├── groupedTools.ts       # Consolidated grouped MCP tools
-│   │   └── tools.ts              # Legacy granular tools
+│   │   ├── groupedTools.ts       # Defines the single 'attom_query' MCP tool
 │   ├── config/
 │   │   └── endpointConfig.ts     # API endpoint configuration
 │   ├── services/
@@ -42,17 +38,11 @@ attom_mcp/
 
 ### Server Implementation
 
-- `runMcpServer.ts`: Starts the MCP server (HTTP or stdio)
-- `mcp/mcpServer.ts`: Core MCP server configuration
-- `mcp/groupedTools.ts`: Consolidated grouped MCP tools
-- `mcp/tools.ts`: Legacy per‑endpoint tools (deprecated)
-- `server.ts`: Express HTTP wrapper (legacy)
-
-### API Framework
-
-- `attomApiFramework.ts`: Core framework for interacting with ATTOM API
-- `services/attomService.ts`: Service layer for ATTOM API endpoints
-- `services/queryManager.ts`: Manages API queries with caching and fallbacks
+- `runMcpServer.ts`: Starts the MCP server (HTTP or stdio).
+- `mcp/mcpServer.ts`: Core MCP server configuration and tool registration.
+- `mcp/groupedTools.ts`: Defines the single `attom_query` MCP tool exposed by the server.
+- `services/attomService.ts`: Service layer handling interaction logic with ATTOM API (used by the MCP tool handler).
+- `services/queryManager.ts`: Manages API queries, caching, and fallbacks (used by MCP handlers).
 
 ### Utilities
 

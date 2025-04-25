@@ -5,7 +5,7 @@
  * leveraging the endpoint configuration and query manager.
  */
 
-import { executeQuery, isValidQuery } from './queryManager.js';
+import { executeAttomQuery } from './queryManager.js'; // Corrected import name
 import { EndpointCategory, getEndpointsByCategory, AllEventsDataField, endpoints } from '../config/endpointConfig.js';
 import { fetchAttom } from '../utils/fetcher.js';
 
@@ -20,12 +20,9 @@ export class AttomService {
    * @returns API response
    */
   public async executeQuery(queryType: string, params: Record<string, any>): Promise<any> {
-    // Validate parameters against endpoint configuration
-    if (!isValidQuery(queryType, params)) {
-      throw new Error(`Invalid query parameters for ${queryType}`);
-    }
+    // Validation is now handled within executeAttomQuery after fallbacks
 
-    return executeQuery(queryType, params);
+    return executeAttomQuery(queryType, params); // Use corrected function name
   }
   
   /**
@@ -274,7 +271,7 @@ export class AttomService {
     propId: string;
     [key: string]: any;
   }): Promise<any> {
-    console.log('[AttomService:getSalesComparablesPropId] Received params:', JSON.stringify(params));
+    console.error('[AttomService:getSalesComparablesPropId] Received params:', JSON.stringify(params));
 
     const queryParams = this.buildComparablesQueryParams(params);
     const path = `/property/v2/salescomparables/propid/${encodeURIComponent(params.propId)}`;

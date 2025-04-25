@@ -235,16 +235,7 @@ export const endpoints: Record<string, EndpointConfig> = {
     cache: VOLATILE_CACHE,
   },
   
-  avmDetail: {
-    path: '/propertyapi/v1.0.0/attomavm/detail',
-    category: EndpointCategory.AVM,
-    description: 'Detailed AVM information for a property',
-    requiredParams: ['address1', 'address2'],
-    optionalParams: [],
-    fallbackStrategy: FallbackStrategy.NONE,
-    rateLimit: DEFAULT_RATE_LIMIT,
-    cache: VOLATILE_CACHE,
-  },
+  // This block was duplicated by the rename of propertyAVMDetail. Removing original.
   
   avmHistoryDetail: {
     path: '/propertyapi/v1.0.0/avmhistory/detail',
@@ -268,7 +259,7 @@ export const endpoints: Record<string, EndpointConfig> = {
     cache: PROPERTY_CACHE,
   },
   
-  propertyAVMDetail: {
+  avmDetail: {
     path: '/propertyapi/v1.0.0/attomavm/detail',
     category: EndpointCategory.AVM,
     description: 'Property AVM details',
@@ -291,16 +282,7 @@ export const endpoints: Record<string, EndpointConfig> = {
   },
   
   // Sales history variants
-  salesHistorySnapshot: {
-    path: '/propertyapi/v1.0.0/saleshistory/snapshot',
-    category: EndpointCategory.SALE,
-    description: 'Sales history snapshot for a property',
-    requiredParams: ['attomid'],
-    optionalParams: [],
-    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
-    rateLimit: DEFAULT_RATE_LIMIT,
-    cache: VOLATILE_CACHE,
-  },
+  // This block was duplicated by the rename of saleSnapshot. Removing original.
 
   // Sale detail and snapshot endpoints
   saleDetail: {
@@ -314,7 +296,7 @@ export const endpoints: Record<string, EndpointConfig> = {
     cache: PROPERTY_CACHE,
   },
 
-  saleSnapshot: {
+  salesHistorySnapshot: {
     path: '/propertyapi/v1.0.0/sale/snapshot',
     category: EndpointCategory.SALE,
     description: 'Sale snapshot for a property',
@@ -470,6 +452,40 @@ export const endpoints: Record<string, EndpointConfig> = {
     fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
     rateLimit: DEFAULT_RATE_LIMIT,
     cache: VOLATILE_CACHE
+  },
+// Added based on CLI functionality
+  assessmentSnapshot: {
+    path: '/propertyapi/v1.0.0/assessment/snapshot',
+    category: EndpointCategory.ASSESSMENT,
+    description: 'Assessment snapshot for a geographic area over a date range', // Added description
+    requiredParams: ['geoIdV4', 'startcalendardate', 'endcalendardate'],
+    optionalParams: ['minassdttlvalue', 'maxassdttlvalue'],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_GEOID,
+    // Note: Date calculation and GeoID extraction logic needs implementation in queryManager
+    rateLimit: DEFAULT_RATE_LIMIT, // Assuming default rate limit
+    cache: PROPERTY_CACHE, // Assuming property cache TTL
+  },
+
+  assessmentHistoryDetail: {
+    path: '/propertyapi/v1.0.0/assessmenthistory/detail',
+    category: EndpointCategory.ASSESSMENT,
+    description: 'Detailed assessment history for a property', // Added description
+    requiredParams: ['attomid'],
+    optionalParams: [],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
+    rateLimit: DEFAULT_RATE_LIMIT, // Assuming default rate limit
+    cache: PROPERTY_CACHE, // Assuming property cache TTL
+  },
+
+  allEventsSnapshot: {
+    path: '/propertyapi/v1.0.0/allevents/snapshot',
+    category: EndpointCategory.ALLEVENTS,
+    description: 'Snapshot of all events for a property', // Added description
+    requiredParams: ['id'], // 'id' likely corresponds to attomid
+    optionalParams: [],
+    fallbackStrategy: FallbackStrategy.ADDRESS_TO_ATTOMID,
+    rateLimit: DEFAULT_RATE_LIMIT, // Assuming default rate limit
+    cache: PROPERTY_CACHE, // Assuming property cache TTL
   },
 };
 

@@ -63,3 +63,16 @@ export function getSalesTrendYearRange(): { startYear: number; endYear: number }
     endYear
   };
 }
+/**
+ * Get a date range for calendar-based queries (last 365 days)
+ * @returns Object with start and end calendar dates formatted as YYYY-MM-DD
+ */
+export function getCalendarDateRange(): { startCalendarDate: string; endCalendarDate: string } {
+  const endCalendarDate = formatDateYYYYMMDD(); // Today
+  const startCalendarDate = formatDateYYYYMMDD(getDateDaysAgo(365)); // 365 days ago
+
+  return {
+    startCalendarDate,
+    endCalendarDate
+  };
+}

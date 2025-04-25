@@ -1,24 +1,36 @@
 # ATTOM MCP Server
 
-A fully-featured **Model Context Protocol (MCP) server** that surfaces the [ATTOM Data](https://www.attomdata.com/) property dataset to AI agents and traditional applications.  Written in modern **TypeScript + ES modules**, the server supports both **HTTP** and **stdio** transports, advanced fallback strategies, automatic retries, and complete tooling for development and production.
+A fully-featured **Model Context Protocol (MCP) server** that surfaces the [ATTOM Data](https://www.attomdata.com/) property dataset to AI agents and traditional applications. Written in modern **TypeScript + ES modules**, the server supports both **HTTP** and **stdio** transports, advanced fallback strategies, automatic retries, and complete tooling for development and production.
 
 ---
 
 ## Table of Contents
 
-1. [Features](#features)
-2. [Architecture Overview](#architecture-overview)
-3. [Installation](#installation)
-4. [Configuration](#configuration)
-5. [Running the Server](#running-the-server)
-6. [MCP Tools and Endpoints](#mcp-tools-and-endpoints)
-7. [Sales Comparables Deep-Dive](#sales-comparables-deep-dive)
-8. [Testing](#testing)
-9. [Project Structure](#project-structure)
-10. [Development Notes](#development-notes)
-11. [OpenAPI Generation](#openapi-generation)
-12. [Troubleshooting](#troubleshooting)
-13. [License](#license)
+- [ATTOM MCP Server](#attom-mcp-server)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Architecture Overview](#architecture-overview)
+  - [Usage Interfaces](#usage-interfaces)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Steps](#steps)
+  - [Configuration](#configuration)
+    - [Environment Variables (`.env`)](#environment-variables-env)
+  - [Running the Server](#running-the-server)
+    - [MCP Server Interface](#mcp-server-interface)
+  - [MCP Tools and Endpoints](#mcp-tools-and-endpoints)
+  - [Sales Comparables Deep-Dive](#sales-comparables-deep-dive)
+    - [Parameters](#parameters)
+      - [Required](#required)
+      - [Optional (defaults)](#optional-defaults)
+      - [Advanced Filters](#advanced-filters)
+    - [Auto-Retry Algorithm](#auto-retry-algorithm)
+  - [Testing](#testing)
+  - [Project Structure](#project-structure)
+  - [Development Notes](#development-notes)
+  - [OpenAPI Generation](#openapi-generation)
+  - [Troubleshooting](#troubleshooting)
+  - [License](#license)
 
 ---
 
@@ -58,10 +70,20 @@ flowchart TD
     Fetcher --> Logger
 ```
 
-* **Transport Layer** – `StreamableHTTPServerTransport` & `StdioServerTransport` from `@modelcontextprotocol/sdk`.
-* **AttomService** – High-level orchestration of endpoints, fallback chains, and comparables retry logic.
-* **Fetcher** – Thin wrapper around `undici.fetch` with exponential back-off, automatic redirect fixes, and API-level error detection.
-* **Cache** – Simple TTL map (swap-out adapter pattern for Redis/Memcached).
+- **Transport Layer** – `StreamableHTTPServerTransport` & `StdioServerTransport` from `@modelcontextprotocol/sdk`.
+- **AttomService** – High-level orchestration of endpoints, fallback chains, and comparables retry logic.
+- **Fetcher** – Thin wrapper around `undici.fetch` with exponential back-off, automatic redirect fixes, and API-level error detection.
+- **Cache** – Simple TTL map (swap-out adapter pattern for Redis/Memcached).
+
+---
+
+## Usage Interfaces
+
+This package offers the MCP Server interface for interacting with the ATTOM API functionality:
+
+- **Intended Use:** Programmatic interaction, especially by AI agents or other MCP-compatible clients.
+- **How it Works:** Launched via `npm run mcp:stdio` or `npm run mcp:http`. Exposes functionality through structured `groupedTools` (e.g., `property_query`, `sales_query`) requiring a `kind` parameter specifying the desired endpoint.
+- **Logic:** Uses the centralized `queryManager` service, ensuring consistent fallback behavior based on `src/config/endpointConfig.ts`.
 
 ---
 
@@ -69,9 +91,9 @@ flowchart TD
 
 ### Prerequisites
 
-* **Node 18+** (ES Modules support)
-* **ATTOM API Key** (required)
-* **Google Maps API Key** (optional – for address normalization)
+- **Node 18+** (ES Modules support)
+- **ATTOM API Key** (required)
+- **Google Maps API Key** (optional – for address normalization)
 
 ### Steps
 
@@ -108,43 +130,53 @@ cp .env.example .env  &&  $EDITOR .env  # add keys
 
 ## Running the Server
 
-### Development (hot reload)
+### MCP Server Interface
 
 ```bash
-npm run dev           # tsx watch src/server.ts
-```
-
-### Production
-
-```bash
-npm run build         # tsc → dist/
-npm start             # node dist/server.js
-```
-
-### MCP Transports
-
-```bash
-npm run mcp:http      # Build & serve MCP over HTTP
-npm run mcp:stdio     # STDIO (ideal for AI tool runners)
+npm run mcp:http      # Build & serve MCP over HTTP (via runMcpServer.js)
+npm run mcp:stdio     # Build & serve MCP over STDIO (via runMcpServer.js)
+npm start             # Alias for npm run mcp:stdio
 ```
 
 ---
 
 ## MCP Tools and Endpoints
 
-Each ATTOM endpoint is wrapped as an MCP **tool** with strict Zod schemas. Tools now live primarily in `src/mcp/groupedTools.ts` (consolidated interface) while legacy per‑endpoint tools remain in `src/mcp/tools.ts` for backward compatibility.
+The primary way to interact with the ATTOM API via the MCP Server interface is using the single **`attom_query`** tool defined in `src/mcp/groupedTools.ts`.
 
-| Tool | Description | Key Params |
-|------|-------------|-----------|
-| `property_query` | Consolidated property‑related endpoints | `kind`, `params` |
-| `sales_query` | Sales comparables & history endpoints | `kind`, `params` |
-| `community_query` | Area insights (schools, community, noise) | `kind`, `params` |
-| `misc_query` | Utility & miscellaneous endpoints | `kind`, `params` |
-| ... | *(legacy granular tools – see code)* | – |
-| `get_sales_comparables_address` | Comparable sales by address | See [Sales Comparables Deep-Dive](#sales-comparables-deep-dive) |
-| `get_sales_comparables_propid` | Comparable sales by ATTOM ID | " |
+This tool requires a `kind` parameter (specifying the exact ATTOM endpoint key from `src/config/endpointConfig.ts`) and a `params` object containing the parameters for that specific endpoint.
 
-All tool metadata (summary, params, returns) is exported to **OpenAPI YAML** (`openapi/attom-api-schema.yaml`).
+Example Usage:
+
+```json
+{
+  "tool_name": "attom_query",
+  "arguments": {
+    "kind": "propertyBasicProfile",
+    "params": {
+      "address1": "123 Main St",
+      "address2": "Anytown, CA 90210"
+    }
+  }
+}
+```
+
+```json
+{
+  "tool_name": "attom_query",
+  "arguments": {
+    "kind": "salesComparablesPropId",
+    "params": {
+      "propId": "123456789",
+      "miles": 2
+    }
+  }
+}
+```
+
+The `kind` parameter accepts any of the endpoint keys defined in `src/config/endpointConfig.ts`.
+
+All registered tool metadata (summary, parameters, etc.) is exported to **OpenAPI YAML** (`openapi/attom-api-schema.yaml`), which can be generated using `npm run gen:openapi`.
 
 ---
 
@@ -159,20 +191,20 @@ The server offers two comparables tools mapped to ATTOM v2 endpoints:
 
 #### Required
 
-* Address variant: `street`, `city`, `county`, `state`, `zip`
-* PropId variant: `propId`
+- Address variant: `street`, `city`, `county`, `state`, `zip`
+- PropId variant: `propId`
 
 #### Optional (defaults)
 
-* `searchType="Radius"`
-* `minComps=1`, `maxComps=10`, `miles=5`
-* Range tuning: `bedroomsRange`, `bathroomRange`, `sqFeetRange`, `yearBuiltRange`, etc.
+- `searchType="Radius"`
+- `minComps=1`, `maxComps=10`, `miles=5`
+- Range tuning: `bedroomsRange`, `bathroomRange`, `sqFeetRange`, `yearBuiltRange`, etc.
 
 #### Advanced Filters
 
-* `include0SalesAmounts` (bool)
-* `includeFullSalesOnly` (bool)
-* `onlyPropertiesWithPool` (bool)
+- `include0SalesAmounts` (bool)
+- `includeFullSalesOnly` (bool)
+- `onlyPropertiesWithPool` (bool)
 
 ### Auto-Retry Algorithm
 
@@ -190,9 +222,9 @@ This logic increases hit-rate by ~35 % in empirical testing.
 
 ## Testing
 
-* **Vitest** – lightweight Jest alternative.
-* All network interactions are **mocked** (`vi.mock('../utils/fetcher.js')`).
-* `npm test` runs in < 1 s.
+- **Vitest** – lightweight Jest alternative.
+- All network interactions are **mocked** (`vi.mock('../utils/fetcher.js')`).
+- `npm test` runs in < 1 s.
 
 Example test:
 
@@ -210,12 +242,10 @@ expect(fetchMock).toHaveBeenCalledTimes(2)
 ```text
 attom-mcp/
 ├─ src/
-│  ├─ server.ts               # Express HTTP wrapper (legacy)
-│  ├─ runMcpServer.ts         # Transport bootstrap (CLI entry)
+│  ├─ runMcpServer.ts         # Transport bootstrap (MCP entry)
 │  ├─ mcp/
-│  │   ├─ groupedTools.ts      # Grouped MCP tools (recommended)
+│  │   ├─ groupedTools.ts      # Grouped MCP tools
 │  │   ├─ mcpServer.ts        # MCP core bridge & registration
-│  │   └─ tools.ts            # Legacy per‑endpoint tools
 │  ├─ services/
 │  │   └─ attomService.ts     # High-level ATTOM orchestrator
 │  ├─ utils/

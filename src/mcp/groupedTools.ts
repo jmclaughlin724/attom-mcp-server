@@ -1,55 +1,28 @@
 /**
- * Grouped MCP Tools
+ * Consolidated MCP Tool for ATTOM API
  *
- * These tools consolidate ATTOM API endpoints by resource type. Each grouped tool
- * accepts a `kind` field that maps to a concrete endpoint key plus a `params`
- * object that is forwarded as‑is to `executeQuery`.  This reduces the overall
- * number of registered tools while preserving existing logic chains and fallback
- * behaviour handled inside `executeQuery` / `AttomService`.
+ * This file defines a single MCP tool, `attom_query`, that acts as a gateway
+ * to all configured ATTOM API endpoints. The specific endpoint is selected
+ * using the `kind` parameter, and the `params` object is forwarded to the
+ * appropriate handler logic in `queryManager`.
  */
 
 import { z } from 'zod';
-import { executeQuery } from '../services/queryManager.js';
-import { endpoints, EndpointCategory } from '../config/endpointConfig.js';
+import { executeAttomQuery } from '../services/queryManager.js';
+import { endpoints } from '../config/endpointConfig.js'; // Import endpoints directly
+import { normalizeAddressInParams } from '../utils/addressNormalizer.js';
+import { writeLog } from '../utils/logger.js';
+
+// Get ALL endpoint keys directly from the configuration
+const ALL_ENDPOINT_KEYS = Object.keys(endpoints);
 
 /**
- * Build an array of endpoint keys that belong to the supplied categories.
+ * Helper to create the consolidated tool definition.
  */
-function getEndpointKeys(categories: EndpointCategory[]): string[] {
-  return Object.entries(endpoints)
-    .filter(([, cfg]) => categories.includes(cfg.category))
-    .map(([key]) => key);
-}
-
-// Group definitions ---------------------------------------------------------
-const PROPERTY_CATEGORIES = [
-  EndpointCategory.PROPERTY,
-  EndpointCategory.ASSESSMENT,
-  EndpointCategory.AVM,
-  EndpointCategory.MORTGAGE,
-  EndpointCategory.PERMIT,
-  EndpointCategory.RENTAL,
-  EndpointCategory.ALLEVENTS,
-];
-
-const SALES_CATEGORIES = [EndpointCategory.SALE];
-const COMMUNITY_CATEGORIES = [EndpointCategory.COMMUNITY];
-const MISC_CATEGORIES = [
-  EndpointCategory.SCHOOL,
-  EndpointCategory.POI,
-  EndpointCategory.TRANSPORTATION,
-];
-
-/**
- * Helper to create a grouped tool definition in the same shape as items in
- * `mcpTools`. We generate a minimal JSON‑schema description for MCP
- * registration.  Detailed per‑endpoint validation continues to live in the
- * individual handlers executed via `executeQuery`.
- */
-function buildGroupedTool(toolName: string, endpointKeys: string[]) {
+function buildConsolidatedTool(toolName: string, endpointKeys: string[]) {
   // Build a Zod schema for runtime validation.
   const toolSchema = z.object({
-    kind: z.enum(endpointKeys as [string, ...string[]]).describe('Endpoint key for this query'),
+    kind: z.enum(endpointKeys as [string, ...string[]]).describe('Target ATTOM endpoint key for this query'),
     params: z
       .record(z.any())
       .default({})
@@ -58,52 +31,51 @@ function buildGroupedTool(toolName: string, endpointKeys: string[]) {
 
   return {
     name: toolName,
-    description: `Execute an ATTOM API query in the ${toolName.replace('_', ' ')} group.`,
+    description: `Execute an ATTOM API query. Specify the target endpoint using the 'kind' parameter (one of: ${endpointKeys.join(', ')})`, // Updated description
     parameters: {
       type: 'object',
       properties: {
         kind: {
           type: 'string',
-          description: `Endpoint key (one of: ${endpointKeys.join(', ')})`,
+          description: `Target ATTOM endpoint key (one of: ${endpointKeys.join(', ')})`, // List all keys
         },
         params: {
           type: 'object',
           description: 'Parameters to forward to the selected endpoint',
-          additionalProperties: true,
+          additionalProperties: true, // Allow any parameters
         },
       },
-      required: ['kind'],
+      required: ['kind'], // Only 'kind' is strictly required by this tool wrapper
     },
     /** Handler forwards to executeQuery while preserving fallback logic. */
     handler: async (input: z.infer<typeof toolSchema>) => {
+      // Validate the input against the schema (kind is required, params is optional object)
       const { kind, params } = toolSchema.parse(input);
-      return executeQuery(kind, params ?? {});
+
+      // Normalize ONLY address fields within the provided params
+      const normalizedParams = await normalizeAddressInParams(params ?? {});
+
+      // Log the normalization for debugging
+      writeLog(`[${toolName}] Original params: ${JSON.stringify(params)}`);
+      writeLog(`[${toolName}] Normalized params: ${JSON.stringify(normalizedParams)}`);
+
+      // Then proceed with executeQuery, which handles endpoint-specific validation and fallbacks
+      return executeAttomQuery(kind, normalizedParams);
     },
-  } as const;
+  } as const; // Use 'as const' for better type inference if needed elsewhere
 }
 
-// Build tool instances ------------------------------------------------------
-const propertyTool = buildGroupedTool(
-  'property_query',
-  getEndpointKeys(PROPERTY_CATEGORIES),
+// Build the single tool instance
+const attomQueryTool = buildConsolidatedTool(
+  'attom_query', // New single tool name
+  ALL_ENDPOINT_KEYS // Use all endpoint keys
 );
 
-const salesTool = buildGroupedTool(
-  'sales_query',
-  getEndpointKeys(SALES_CATEGORIES),
-);
+// Export only the single consolidated tool in the array expected by mcpServer.ts
+export const groupedTools = [attomQueryTool] as const;
 
-const communityTool = buildGroupedTool(
-  'community_query',
-  getEndpointKeys(COMMUNITY_CATEGORIES),
-);
-
-const miscTool = buildGroupedTool('misc_query', getEndpointKeys(MISC_CATEGORIES));
-
-export const groupedTools = [propertyTool, salesTool, communityTool, miscTool] as const;
-
-// Named exports for easier unit testing
-export const propertyQueryTool = propertyTool;
-export const salesQueryTool = salesTool;
-export const communityQueryTool = communityTool;
-export const miscQueryTool = miscTool;
+// No longer exporting individual tools
+// export const propertyQueryTool = propertyTool;
+// export const salesQueryTool = salesTool;
+// export const communityQueryTool = communityTool;
+// export const miscQueryTool = miscTool;
