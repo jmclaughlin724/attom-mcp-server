@@ -123,10 +123,13 @@ export function createMcpServer() {
     "property",
     new ResourceTemplate("property://{address}", { list: undefined }),
     async (uri: URL, params: Record<string, any>) => {
-      const address = params.address as string;
+      const rawAddress = params.address as string;
+      // Decode the address parameter in case it was URL-encoded
+      const decodedAddress = decodeURIComponent(rawAddress);
+      writeLog(`[Resource:property] Received address: "${rawAddress}", Decoded: "${decodedAddress}"`);
       try {
-        // Normalize the address
-        const normalized = await normalizeAddressStringForAttom(address);
+        // Normalize the *decoded* address
+        const normalized = await normalizeAddressStringForAttom(decodedAddress);
         if (!normalized) {
           throw new Error("Failed to normalize address");
         }
@@ -149,7 +152,7 @@ export function createMcpServer() {
             uri: uri.href,
             text: JSON.stringify({
               error: error.message ?? "Unknown error",
-              address
+              address: decodedAddress // Return the decoded address in case of error
             }, null, 2)
           }]
         };

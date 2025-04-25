@@ -21,10 +21,12 @@ const ALL_ENDPOINT_KEYS = Object.keys(endpoints);
  */
 function buildConsolidatedTool(toolName: string, endpointKeys: string[]) {
   // Build a Zod schema for runtime validation.
+  // Loosen params validation slightly at this stage due to potential Inspector nesting issue
   const toolSchema = z.object({
     kind: z.enum(endpointKeys as [string, ...string[]]).describe('Target ATTOM endpoint key for this query'),
     params: z
-      .record(z.any())
+      .record(z.any()) // Accept any object structure initially
+      .optional()
       .default({})
       .describe('Parameters for the selected endpoint'),
   });
@@ -41,28 +43,57 @@ function buildConsolidatedTool(toolName: string, endpointKeys: string[]) {
         },
         params: {
           type: 'object',
-          description: 'Parameters to forward to the selected endpoint',
+          description: 'Parameters to forward to the selected endpoint (e.g., {"address1": "...", "address2": "..."})', // Updated example
           additionalProperties: true, // Allow any parameters
         },
       },
       required: ['kind'], // Only 'kind' is strictly required by this tool wrapper
     },
     /** Handler forwards to executeQuery while preserving fallback logic. */
-    handler: async (input: z.infer<typeof toolSchema>) => {
-      // Validate the input against the schema (kind is required, params is optional object)
-      const { kind, params } = toolSchema.parse(input);
+    handler: async (input: Record<string, any>) => { // Accept raw object first
+      writeLog(`[${toolName} Handler] Received RAW input: ${JSON.stringify(input, null, 2)}`);
 
-      // Normalize ONLY address fields within the provided params
-      const normalizedParams = await normalizeAddressInParams(params ?? {});
+      let kind: string;
+      let paramsFromInput: Record<string, any>;
 
-      // Log the normalization for debugging
-      writeLog(`[${toolName}] Original params: ${JSON.stringify(params)}`);
-      writeLog(`[${toolName}] Normalized params: ${JSON.stringify(normalizedParams)}`);
+      try {
+        // Basic validation for top-level structure
+        if (typeof input !== 'object' || input === null) {
+            throw new Error('Invalid input: Expected an object.');
+        }
+        if (typeof input.kind !== 'string' || !ALL_ENDPOINT_KEYS.includes(input.kind)) {
+            throw new Error(`Invalid or missing 'kind'. Must be one of: ${ALL_ENDPOINT_KEYS.join(', ')}`);
+        }
+         kind = input.kind;
+         // Use input.params directly, default to {} if missing
+         paramsFromInput = (typeof input.params === 'object' && input.params !== null) ? input.params : {}; 
+         writeLog(`[${toolName} Handler] Initial kind: ${kind}`);
+         writeLog(`[${toolName} Handler] Initial paramsFromInput: ${JSON.stringify(paramsFromInput, null, 2)}`);
 
-      // Then proceed with executeQuery, which handles endpoint-specific validation and fallbacks
+      } catch (initialError) {
+         writeLog(`[${toolName} Handler] Initial input structure validation failed: ${initialError}`);
+         throw initialError;
+      }
+
+      // --- WORKAROUND for potential Inspector nesting ---
+      let actualParams = paramsFromInput;
+      if (typeof paramsFromInput.params === 'object' && paramsFromInput.params !== null && typeof paramsFromInput.kind === 'string') {
+          writeLog(`[${toolName} Handler] Detected nested structure, likely from Inspector. Using inner params.`);
+          actualParams = paramsFromInput.params; // Use the inner params object
+      }
+      // --- END WORKAROUND ---
+
+      writeLog(`[${toolName} Handler] Params before normalization: ${JSON.stringify(actualParams, null, 2)}`);
+
+      // Normalize address fields within the actual parameters object
+      const normalizedParams = await normalizeAddressInParams(actualParams);
+
+      writeLog(`[${toolName} Handler] Normalized params (after normalization): ${JSON.stringify(normalizedParams)}`);
+
+      // Proceed with executeQuery using the extracted kind and normalized (potentially un-nested) params
       return executeAttomQuery(kind, normalizedParams);
     },
-  } as const; // Use 'as const' for better type inference if needed elsewhere
+  } as const;
 }
 
 // Build the single tool instance
@@ -73,9 +104,3 @@ const attomQueryTool = buildConsolidatedTool(
 
 // Export only the single consolidated tool in the array expected by mcpServer.ts
 export const groupedTools = [attomQueryTool] as const;
-
-// No longer exporting individual tools
-// export const propertyQueryTool = propertyTool;
-// export const salesQueryTool = salesTool;
-// export const communityQueryTool = communityTool;
-// export const miscQueryTool = miscTool;

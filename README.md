@@ -252,7 +252,7 @@ attom-mcp/
 │  │   ├─ fetcher.ts          # Retry, logging, cache hook
 │  │   └─ fallback.ts         # attomId / geoId derivation
 │  ├─ config/endpointConfig.ts# Central endpoint map
-│  └─ __tests__/              # Vitest specs
+│  └─ mcp/mcpServer.test.ts   # Basic Vitest spec
 ├─ openapi/attom-api-schema.yaml
 ├─ .env.example
 └─ tsconfig.json

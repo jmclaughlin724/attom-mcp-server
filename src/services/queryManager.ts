@@ -203,22 +203,54 @@ async function handleAddressToGeoIdFallback(
     writeLog(`[QueryManager:handleAddressToGeoIdFallback] Applying ADDRESS_TO_GEOID fallback for ${endpointKey} (seeking ${requiredGeoIdParam}).`);
     const useNormalization = true;
     const cacheKey = `geoid:${params.address1}:${params.address2}`;
-    const geoIdSubtype = config.preferredGeoIdSubtype ?? 'N2';
-    const foundGeoId = await fallbackGeoIdV4SubtypeCached(
+    const preferredSubtype = config.preferredGeoIdSubtype ?? 'N2'; // Default preference if not specified in config
+    const commonFallbackSubtype = 'CO'; // Use County FIPS as a common fallback if preferred is missing
+
+    // Fetch the entire GeoID map from the fallback utility
+    const geoIdMap = await fallbackGeoIdV4SubtypeCached( // Function now returns Record<string, string>
       params.address1,
       params.address2,
-      geoIdSubtype,
+      preferredSubtype, // Still pass preferred for potential caching optimization
       cacheKey,
       useNormalization
     );
-    if (foundGeoId) {
-      const processed = processGeoIdV4(foundGeoId, geoIdSubtype);
+
+    let selectedGeoIdValue: string | undefined = undefined;
+    let selectedSubtype: string | undefined = undefined;
+
+    // 1. Try the preferred/default subtype
+    if (geoIdMap[preferredSubtype]) {
+      selectedGeoIdValue = geoIdMap[preferredSubtype];
+      selectedSubtype = preferredSubtype;
+      writeLog(`[QueryManager:handleAddressToGeoIdFallback] Using preferred/default GeoID subtype '${selectedSubtype}': ${selectedGeoIdValue}`);
+    }
+    // 2. If preferred not found, try the common fallback subtype
+    else if (geoIdMap[commonFallbackSubtype]) {
+      selectedGeoIdValue = geoIdMap[commonFallbackSubtype];
+      selectedSubtype = commonFallbackSubtype;
+      writeLog(`[QueryManager:handleAddressToGeoIdFallback] Preferred subtype '${preferredSubtype}' not found. Using fallback subtype '${selectedSubtype}': ${selectedGeoIdValue}`);
+    }
+    // 3. If neither found, check if *any* GeoID exists in the map as a last resort
+    else {
+       const firstAvailableKey = Object.keys(geoIdMap)[0];
+       if (firstAvailableKey) {
+           selectedGeoIdValue = geoIdMap[firstAvailableKey];
+           selectedSubtype = firstAvailableKey;
+           writeLog(`[QueryManager:handleAddressToGeoIdFallback] Preferred and fallback subtypes not found. Using first available GeoID ('${selectedSubtype}'): ${selectedGeoIdValue}`);
+       }
+    }
+
+    // Process the selected GeoID if one was found
+    if (selectedGeoIdValue && selectedSubtype) {
+      // The processGeoIdV4 function handles potential comma-separated values within a single subtype string
+      const processed = processGeoIdV4(selectedGeoIdValue, selectedSubtype);
       updatedParams[requiredGeoIdParam] = processed;
-      writeLog(`[QueryManager:handleAddressToGeoIdFallback] Fallback successful. Using GeoID: ${processed}`);
+      writeLog(`[QueryManager:handleAddressToGeoIdFallback] Fallback successful. Using processed GeoID: ${processed} (from subtype ${selectedSubtype})`);
     } else {
-      writeLog(`[applyFallbackStrategy] ADDRESS_TO_GEOID fallback failed to find GeoID. No ID found after all attempts.`);
+      // Only throw error if the parameter was truly required and couldn't be found
+      writeLog(`[QueryManager:handleAddressToGeoIdFallback] ADDRESS_TO_GEOID fallback failed to find any suitable GeoID.`);
       if (config.requiredParams.includes(requiredGeoIdParam)) {
-        throw new Error(`Required parameter '${requiredGeoIdParam}' could not be derived from address for endpoint ${endpointKey}.`);
+        throw new Error(`Required parameter '${requiredGeoIdParam}' could not be derived from address for endpoint ${endpointKey}. No suitable GeoID found.`);
       }
     }
   }

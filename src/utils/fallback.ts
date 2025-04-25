@@ -95,12 +95,14 @@ function checkPropertyIdentifierAttomId(response: any): string | null {
     return response.property[0].identifier.attomId.toString();
   }
   
-  // Check alternate location (Id field as a known alias) - just log, don't return
+  // Check alternate location (Id field as a known alias) - use if attomId not found
   if (response?.property?.[0]?.identifier?.Id) {
-    writeLog(`[Fallback] Found Id in property identifier: ${response.property[0].identifier.Id} (Using as fallback)`);
+    const idValue = response.property[0].identifier.Id.toString();
+    writeLog(`[Fallback] Found Id in property identifier: ${idValue} (Using as fallback)`);
+    return idValue; // Return the Id if found
   }
   
-  return null;
+  return null; // Return null if neither attomId nor Id is found
 }
 
 /**
@@ -135,9 +137,11 @@ function checkPropertyArrayAttomIds(response: any): string | null {
       return prop.attomId.toString();
     }
     
-    // Check identifier 'Id' within array element - just log, don't return
+    // Check identifier 'Id' within array element - use if attomId not found
     if (prop?.identifier?.Id) {
-       writeLog(`[Fallback] Found Id in property array identifier: ${prop.identifier.Id} (Using as fallback)`);
+      const idValue = prop.identifier.Id.toString();
+      writeLog(`[Fallback] Found Id in property array identifier: ${idValue} (Using as fallback)`);
+      return idValue; // Return the Id if found
     }
   }
   
@@ -384,13 +388,16 @@ async function fetchBuildingPermitsWithRetry(
       
       // Log the response for debugging
       writeLog(`[Fallback] Building permits response: ${JSON.stringify(detail, null, 2)}`);      
-      if (detail?.status === 'ok' && detail?.property?.[0]?.identifier?.attomId) {
-        return detail; // Successfully got the data with ATTOM ID
+      // Use the robust extraction function to check for an ID anywhere
+      const extractedId = extractAttomIdFromResponse(detail);
+      if (extractedId) {
+        writeLog(`[Fallback] fetchBuildingPermitsWithRetry succeeded with ID: ${extractedId}`);
+        return detail; // Successfully got the data containing an ATTOM ID
       }
       
-      // If we got a response but it doesn't have the data we need
-      if (detail?.status === 'ok') {
-        writeLog('[Fallback] Got successful response but no attomId data');
+      // Log if the request was successful but no ID was extractable
+      if (detail?.status === 'ok' || detail?.status?.code === 0) {
+        writeLog('[Fallback] fetchBuildingPermitsWithRetry got successful response but no extractable attomId');
       }
       
     } catch (error: unknown) {
@@ -477,7 +484,7 @@ export async function fallbackGeoIdV4SubtypeCached(
   subtype: string,
   cacheKey: string,
   useGoogleNormalization: boolean = true
-): Promise<string> {
+): Promise<Record<string, string>> { // Return the whole map
   // Type assertion to help TypeScript understand our cache structure
   const cache = getRequestCache(cacheKey) as GeoIdCache;
   
@@ -486,20 +493,22 @@ export async function fallbackGeoIdV4SubtypeCached(
     cache.geoIdV4 = {};
   }
   
-  // If we already have the geoIdV4 map in cache, use it
-  if (cache.geoIdV4[subtype]) {
-    return cache.geoIdV4[subtype];
+  // If we already have the full geoIdV4 map populated in cache, return it
+  if (Object.keys(cache.geoIdV4).length > 0) {
+    writeLog(`[Fallback] Using cached GeoID map for key: ${cacheKey}`);
+    return cache.geoIdV4;
   }
   
-  // Check data cache first
-  const cacheDataKey = `geoIdV4:${address1}:${address2}:${subtype}`;
-  const cachedGeoId = getCachedData(cacheDataKey);
-  if (cachedGeoId) {
-    cache.geoIdV4[subtype] = cachedGeoId;
-    return cachedGeoId;
+  // Check data cache for the *entire map* first (adjust cache key)
+  const mapCacheDataKey = `geoIdV4Map:${address1}:${address2}`;
+  const cachedGeoIdMap = getCachedData(mapCacheDataKey);
+  if (cachedGeoIdMap && typeof cachedGeoIdMap === 'object' && Object.keys(cachedGeoIdMap).length > 0) {
+    writeLog(`[Fallback] Using data-cached GeoID map for address: ${address1}, ${address2}`);
+    cache.geoIdV4 = cachedGeoIdMap; // Populate request cache
+    return cachedGeoIdMap;
   }
   
-  writeLog(`[Fallback] calling /property/buildingpermits => geoIdV4 for subtype: ${subtype}`);
+  writeLog(`[Fallback] calling /property/buildingpermits => geoIdV4 for subtype: ${subtype}`); // Reverted endpoint log
   
   // Try to normalize the address using Google Places if enabled
   const { normalizedAddress1, normalizedAddress2 } = await normalizeAddressIfEnabled(
@@ -508,7 +517,7 @@ export async function fallbackGeoIdV4SubtypeCached(
     useGoogleNormalization
   );
   
-  // Fetch building permits with retry logic
+  // Fetch building permits with retry logic (Reverted endpoint call)
   const detail = await fetchBuildingPermitsWithRetry(
     normalizedAddress1,
     normalizedAddress2
@@ -533,12 +542,19 @@ export async function fallbackGeoIdV4SubtypeCached(
   // We know cache.geoIdV4 is defined because we initialized it at the beginning of the function
   Object.entries(cache.geoIdV4).forEach(([key, value]) => {
     if (value) { // Only cache non-empty values
-      cacheData(`geoIdV4:${address1}:${address2}:${key}`, value, '/propertyapi/v1.0.0/property/buildingpermits');
+      cacheData(`geoIdV4:${address1}:${address2}:${key}`, value, '/propertyapi/v1.0.0/property/buildingpermits'); // Corrected cache source endpoint
     }
   });
-  
-  return cache.geoIdV4[subtype] ?? '';
 
+  // Cache the entire map if found
+  if (Object.keys(cache.geoIdV4).length > 0) {
+     cacheData(mapCacheDataKey, cache.geoIdV4, '/propertyapi/v1.0.0/property/buildingpermits'); // Corrected cache source endpoint
+  }
+
+  // Return the potentially populated map (could be empty if API failed or had no GeoIDs)
+  return cache.geoIdV4;
+
+  // Removed incorrect return statement that was returning string instead of map
 }
 
 /**

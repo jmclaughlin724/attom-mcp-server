@@ -1,18 +1,18 @@
+import dotenv from 'dotenv';
+// Load environment variables *immediately*
+console.error('[runMcpServer] Loading environment variables...');
+dotenv.config();
+console.error(`[runMcpServer] Environment loaded. ATTOM_API_KEY set: ${!!process.env.ATTOM_API_KEY}`);
+
 /**
  * Run MCP Server
- * 
+ *
  * This script starts the Model Context Protocol server for the ATTOM API.
  * It can be run in either stdio or HTTP mode.
  */
 console.error('[runMcpServer] Script started.');
 
 import { startMcpServer } from './mcp/mcpServer.js';
-import dotenv from 'dotenv';
-
-// Load environment variables
-console.error('[runMcpServer] Loading environment variables...');
-dotenv.config();
-console.error(`[runMcpServer] Environment loaded. ATTOM_API_KEY set: ${!!process.env.ATTOM_API_KEY}`);
 
 // Get transport type from command line arguments
 const args = process.argv.slice(2);
